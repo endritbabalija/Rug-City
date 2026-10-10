@@ -62,6 +62,30 @@ describe('hosting costs', () => {
   })
 })
 
+describe('solo testing', () => {
+  it('lets an admin host start alone, but not anyone else', async () => {
+    const [admin, other] = ids(2)
+    await mkPlayer(admin)
+    await mkPlayer(other)
+    process.env.ADMIN_TELEGRAM_IDS = `999,${admin}`
+    try {
+      const solo = await lobbyWith(admin, [])
+      expect((await rooms.viewRoom(solo, await fresh(admin))).minPlayers).toBe(1)
+      const started = await rooms.act(solo, await fresh(admin), { type: 'start' })
+      expect(started.phase).toBe('briefing')
+      const view = await rooms.viewRoom(solo, await fresh(admin))
+      // Alone, you hold every clue and every suspect talks to you.
+      expect(view.myClues.length).toBe(11)
+      expect(view.mySuspects.length).toBe(5)
+
+      const normal = await lobbyWith(other, [])
+      await expect(rooms.act(normal, await fresh(other), { type: 'start' })).rejects.toMatchObject({ code: 'NOT_ENOUGH_PLAYERS' })
+    } finally {
+      delete process.env.ADMIN_TELEGRAM_IDS
+    }
+  })
+})
+
 describe('power-ups', () => {
   it('spends an item on success and keeps it when the action is rejected', async () => {
     const [host, a, b] = ids(3)

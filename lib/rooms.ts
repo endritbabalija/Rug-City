@@ -37,6 +37,12 @@ async function loadRoom(code: string) {
   return { room, caseFile: requireCase(room.caseId) }
 }
 
+/** Admins (ADMIN_TELEGRAM_IDS) can host a case alone to test it in production. */
+function minPlayersFor(hostId: number) {
+  const cfg = env()
+  return cfg.adminIds.includes(hostId) ? 1 : cfg.minPlayers
+}
+
 const badgeOf = (p: Player) => (p.activeBadge ? BADGES[p.activeBadge]?.icon : undefined)
 
 export async function createRoom(player: Player, caseId: string) {
@@ -50,7 +56,7 @@ export async function createRoom(player: Player, caseId: string) {
 
 export async function viewRoom(code: string, player: Player) {
   const { room, caseFile } = await loadRoom(code)
-  return { ...buildView(room, caseFile, player.id, Date.now()), member: engine.isMember(room, player.id), minPlayers: env().minPlayers }
+  return { ...buildView(room, caseFile, player.id, Date.now()), member: engine.isMember(room, player.id), minPlayers: minPlayersFor(room.hostId) }
 }
 
 /** Run a pure engine step against the stored room with optimistic concurrency. */
@@ -106,7 +112,7 @@ export async function act(code: string, player: Player, action: RoomAction) {
     case 'leave':
       return mutate(code, (s, _c, now) => engine.leave(s, player.id, now))
     case 'start': {
-      const minPlayers = env().minPlayers
+      const minPlayers = minPlayersFor(player.id)
       let usedFree = false
       return chargedStep(
         code,
