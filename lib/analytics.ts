@@ -3,7 +3,7 @@ import { after } from 'next/server'
 import { store } from './store'
 
 /** Every product event we record. Add a name here before tracking it. */
-export type EventName = 'app_open' | 'case_start' | 'case_finish' | 'purchase' | 'invite_joined' | 'ai_call' | 'dex_ask' | 'invite_sent'
+export type EventName = 'app_open' | 'case_start' | 'case_finish' | 'purchase' | 'invite_joined' | 'ai_call' | 'dex_ask' | 'invite_sent' | 'tutorial_step' | 'tutorial_done'
 
 /**
  * Record a product event in the `events` table. Inside a request the write runs after

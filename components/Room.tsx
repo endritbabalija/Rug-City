@@ -1,8 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRoom, type RoomData } from '@/hooks/useRoom'
 import { ApiError, isTelegram } from '@/lib/client/api'
+import type { TutorialStep } from '@/lib/game/types'
 import { forgetRoom, rememberRoom } from '@/lib/client/lastRoom'
 import { bindBackButton, canFullscreen, onFullscreenChange, setClosingConfirmation, setFullscreen, webApp } from '@/lib/telegram/webapp'
 import { Accuse } from './phases/Accuse'
@@ -20,6 +21,16 @@ export interface PhaseProps {
   busy: string | null
   ask: (suspectId: string, text: string) => Promise<void>
   now: () => number
+  tips: TipProps
+}
+
+/** Dex's tutorial tips (tutorial rooms only; see DexTip). */
+export interface TipProps {
+  /** Tell the server the player reached this step. Sent once per step; failures are ignored. */
+  reach: (step: TutorialStep) => void
+  /** Whether the step's tip shows on its screen: not reached before this visit, and not dismissed. */
+  show: (step: TutorialStep) => boolean
+  dismiss: (step: TutorialStep) => void
 }
 
 const PHASE_LABEL: Record<RoomData['phase'], string> = {
@@ -45,6 +56,10 @@ export function Room({ code }: { code: string }) {
   const [fullscreen, setFs] = useState(() => !!webApp()?.isFullscreen)
   const [confirmLeave, setConfirmLeave] = useState(false)
   const joinTried = useRef(false)
+  const tipsSent = useRef(new Set<TutorialStep>())
+  // Steps reached before this visit (taken from the first load) or dismissed since: their tips stay hidden.
+  const [hiddenTips, setHiddenTips] = useState<Set<TutorialStep> | null>(null)
+  if (room && hiddenTips === null) setHiddenTips(new Set(room.tutorial?.reached.map((r) => r.step)))
   const lastPhase = useRef<string | null>(null)
   const live = !!room && room.member && room.phase !== 'lobby' && room.phase !== 'reveal'
   const liveRef = useRef(live)
@@ -76,6 +91,20 @@ export function Room({ code }: { code: string }) {
       }
     },
     [act, toast],
+  )
+
+  const reachedTips = room?.tutorial?.reached
+  const tips = useMemo<TipProps>(
+    () => ({
+      reach: (step) => {
+        if (tipsSent.current.has(step) || reachedTips?.some((r) => r.step === step)) return
+        tipsSent.current.add(step)
+        act({ type: 'tutorialStep', step }).catch(() => tipsSent.current.delete(step))
+      },
+      show: (step) => !!hiddenTips && !hiddenTips.has(step),
+      dismiss: (step) => setHiddenTips((h) => new Set(h).add(step)),
+    }),
+    [act, reachedTips, hiddenTips],
   )
 
   // Opening a room link joins you automatically while the lobby is open.
@@ -132,7 +161,7 @@ export function Room({ code }: { code: string }) {
     )
   }
 
-  const props: PhaseProps = { room, run, busy, ask, now }
+  const props: PhaseProps = { room, run, busy, ask, now, tips }
 
   return (
     <div className="pb-8">

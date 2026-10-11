@@ -21,6 +21,7 @@ interface MeResponse {
   cases: CaseSummary[]
   districts: DistrictSummary[]
   nextDrop: string | null
+  nextCase: GameCtx['nextCase']
   skus: Sku[]
   badges: GameCtx['badges']
   flags: GameCtx['flags']
@@ -116,6 +117,7 @@ export function Game() {
             cases: me.cases,
             districts: me.districts,
             nextDrop: me.nextDrop,
+            nextCase: me.nextCase,
             skus: me.skus,
             badges: me.badges,
             flags: me.flags,

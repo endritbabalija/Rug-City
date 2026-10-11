@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { haptic } from '@/lib/telegram/webapp'
+import { DexTip } from '../evidence/DexTip'
 import type { PhaseProps } from '../Room'
 import { Button, Confirm, Countdown, Label, useClock } from '../ui'
 
@@ -21,7 +22,7 @@ function Choice({ selected, onClick, children }: { selected: boolean; onClick: (
   )
 }
 
-export function Accuse({ room, run, busy, now }: PhaseProps) {
+export function Accuse({ room, run, busy, now, tips }: PhaseProps) {
   const c = room.case
   const [culprit, setCulprit] = useState(room.myVote?.culprit ?? '')
   const [motive, setMotive] = useState(room.myVote?.motive ?? '')
@@ -44,6 +45,7 @@ export function Accuse({ room, run, busy, now }: PhaseProps) {
 
   return (
     <div className="px-4 pt-5 pb-36">
+      <DexTip step="vote" room={room} tips={tips} className="mb-5" />
       <h2 className="font-display text-5xl leading-[0.9] font-black uppercase">
         Name the <span className="text-rug">rugger</span>
       </h2>

@@ -1,5 +1,5 @@
 import type { CaseFile, Clue, Option, Tx, Wallet } from '../cases/types'
-import { dexHand, dexHintsLeft, dexNextReleaseAt, dexReleaseAt, dexReleased, hasDex } from './dex'
+import { dexHand, dexHintsLeft, dexNextReleaseAt, dexReleaseAt, dexReleased, hasDex, TUTORIAL_TIPS } from './dex'
 import { chatKey, cluesFor, countCorrect, questionsLeft, roomMode, suspectsFor } from './engine'
 import { NO_HELP } from './scoring'
 import {
@@ -14,6 +14,7 @@ import {
   type FeedItem,
   type Phase,
   type RoomResult,
+  type TutorialStep,
   type Vote,
 } from './types'
 import type { RoomState } from './types'
@@ -87,6 +88,8 @@ export interface RoomView {
     hintsLeft: number
     nextReleaseAt: number | null
   } | null
+  /** Tutorial rooms: Dex's tip for every step, and the steps reached so far (each tip shows once). */
+  tutorial: { tips: Record<TutorialStep, string>; reached: { step: TutorialStep; at: number }[] } | null
   result:
     | (RoomResult & {
         answer: Vote
@@ -182,6 +185,7 @@ export function buildView(state: RoomState, c: CaseFile, playerId: number, now: 
             nextReleaseAt: dexNextReleaseAt(state, c, now),
           }
         : null,
+    tutorial: state.tutorial && inCase ? { tips: TUTORIAL_TIPS, reached: state.tutorialSteps ?? [] } : null,
     result:
       revealed && state.result
         ? {

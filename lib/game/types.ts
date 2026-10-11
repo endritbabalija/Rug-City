@@ -89,6 +89,10 @@ export interface CaseStats {
   updatedAt: number
 }
 
+/** The steps of a tutorial room where Dex gives a tip, in play order. */
+export const TUTORIAL_STEPS = ['briefing', 'clue', 'explorer', 'chat', 'vote'] as const
+export type TutorialStep = (typeof TUTORIAL_STEPS)[number]
+
 export interface RoomState {
   code: string
   caseId: string
@@ -96,6 +100,10 @@ export interface RoomState {
   mode?: CaseMode
   /** An admin's free test of a case in review: no charge, no points, no result row. */
   playtest?: boolean
+  /** A new player's first case: solo, with Dex's tips at each step (flag `tutorial`). */
+  tutorial?: boolean
+  /** Tutorial steps the player has reached, in order; each tip shows once. */
+  tutorialSteps?: { step: TutorialStep; at: number }[]
   hostId: number
   createdAt: number
   phase: Phase

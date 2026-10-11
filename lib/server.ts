@@ -7,7 +7,8 @@ import { env } from './env'
 import { caseForRoom } from './cases'
 import { GameError } from './game/engine'
 import { progressSummary, seasonAt } from './game/progress'
-import { hasFreeCase, newPlayer, type Player, type RecentCase } from './player'
+import { flag } from './flags'
+import { freeCasesToday, newPlayer, type Player, type RecentCase } from './player'
 import { getSeasons } from './seasons'
 import { store } from './store'
 import { ConflictError } from './store/types'
@@ -122,11 +123,13 @@ const RECENT_CASES = 10
 export async function publicPlayer(p: Player) {
   const now = Date.now()
   const seasons = await getSeasons()
-  const [badges, seasonScores, results] = await Promise.all([
+  const [badges, seasonScores, results, dayOne] = await Promise.all([
     store().getBadges(p.id),
     store().seasonScores(p.id, seasonAt(now, seasons)),
     store().recentResults(p.id, RECENT_CASES),
+    flag('tutorial'),
   ])
+  const free = freeCasesToday(p, now, dayOne)
   const files = await Promise.all(results.map((r) => caseForRoom(r.caseId)))
   const recent = results.flatMap((r, i): RecentCase[] => {
     const c = files[i]
@@ -136,7 +139,9 @@ export async function publicPlayer(p: Player) {
     id: p.id,
     name: p.name,
     caseCredits: p.caseCredits,
-    freeCaseAvailable: hasFreeCase(p, now),
+    freeCaseAvailable: free > 0,
+    /** Free cases left today: up to DAY_ONE_FREE_CASES on the signup day (flag `tutorial`), else 0 or 1. */
+    freeCasesToday: free,
     items: p.items,
     badges,
     activeBadge: p.activeBadge ?? null,

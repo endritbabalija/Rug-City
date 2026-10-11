@@ -14,6 +14,7 @@ interface PlayerRow {
   trace: number
   hint: number
   free_case_day: string | null
+  day_one_used: number
   referred_by: number | null
   referral_settled: boolean
   active_badge: string | null
@@ -27,7 +28,7 @@ interface PlayerRow {
 }
 
 const PLAYER_COLUMNS =
-  'id, name, username, photo_url, case_credits, subpoena, trace, hint, free_case_day, referred_by, referral_settled, active_badge, clue_points, streak_days, last_rated_day, rated_day, rated_count, created_at, version'
+  'id, name, username, photo_url, case_credits, subpoena, trace, hint, free_case_day, day_one_used, referred_by, referral_settled, active_badge, clue_points, streak_days, last_rated_day, rated_day, rated_count, created_at, version'
 
 const toPlayer = (r: PlayerRow): Player => ({
   id: Number(r.id),
@@ -36,6 +37,7 @@ const toPlayer = (r: PlayerRow): Player => ({
   photoUrl: r.photo_url ?? undefined,
   caseCredits: r.case_credits,
   freeCaseDay: r.free_case_day ?? undefined,
+  dayOneUsed: r.day_one_used,
   items: { subpoena: r.subpoena, trace: r.trace, hint: r.hint },
   activeBadge: r.active_badge ?? undefined,
   referredBy: r.referred_by === null ? undefined : Number(r.referred_by),
@@ -58,6 +60,7 @@ const playerColumns = (p: Player) => ({
   trace: p.items.trace ?? 0,
   hint: p.items.hint ?? 0,
   free_case_day: p.freeCaseDay ?? null,
+  day_one_used: p.dayOneUsed ?? 0,
   referred_by: p.referredBy ?? null,
   referral_settled: !!p.referralSettled,
   active_badge: p.activeBadge ?? null,

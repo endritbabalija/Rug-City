@@ -5,6 +5,8 @@ import { caseBoard } from '@/lib/cases'
 import { badgeInfo, BADGES, SKUS } from '@/lib/catalog'
 import { flag } from '@/lib/flags'
 import { GameError } from '@/lib/game/engine'
+import { TUTORIAL_CASE_ID } from '@/lib/game/dex'
+import { isTutorial } from '@/lib/rooms'
 import { authenticate, isAdmin, publicPlayer, route } from '@/lib/server'
 import { store } from '@/lib/store'
 
@@ -13,9 +15,9 @@ export const GET = route(async (req) => {
   track('app_open', player.id, { startParam: init?.startParam ?? null })
   const [pub, board, seasonBanner, solo, dexCrew, districts] = await Promise.all([
     publicPlayer(player),
-    store()
-      .playedCaseIds(player.id)
-      .then((played) => caseBoard(player, played)),
+    Promise.all([store().playedCaseIds(player.id), isTutorial(player, TUTORIAL_CASE_ID)]).then(([played, tutorial]) =>
+      caseBoard(player, played, Date.now(), tutorial ? TUTORIAL_CASE_ID : undefined),
+    ),
     flag('season_banner'),
     flag('solo'),
     flag('dex_crew'),

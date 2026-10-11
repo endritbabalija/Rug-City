@@ -1,10 +1,11 @@
 'use client'
 
 import type { PhaseProps } from '../Room'
+import { DexTip } from '../evidence/DexTip'
 import { SuspectCard } from '../evidence/SuspectCard'
 import { Button, Countdown, Label, Stamp, useClock } from '../ui'
 
-export function Briefing({ room, run, busy, now }: PhaseProps) {
+export function Briefing({ room, run, busy, now, tips }: PhaseProps) {
   const c = room.case
   const readyCount = room.players.filter((p) => p.ready).length
   const at = useClock(now)
@@ -13,6 +14,7 @@ export function Briefing({ room, run, busy, now }: PhaseProps) {
 
   return (
     <div className="pb-28">
+      <DexTip step="briefing" room={room} tips={tips} className="mx-4 mt-5" />
       <section className="paper relative mx-4 mt-5 rounded-sm p-5">
         <div className="absolute top-4 right-4">
           <Stamp className="text-sm">Rugged</Stamp>

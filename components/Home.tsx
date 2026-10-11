@@ -36,7 +36,7 @@ function useOpenCase() {
 }
 
 export function Home() {
-  const { player, cases, badges, flags, isAdmin, go, toast } = useGame()
+  const { player, cases, nextCase, badges, flags, isAdmin, go, toast } = useGame()
   const [code, setCode] = useState('')
   const openCase = useOpenCase()
 
@@ -87,7 +87,11 @@ export function Home() {
       )}
 
       <section className="mx-5 flex flex-wrap items-center gap-2 border-y border-line py-3">
-        {player.freeCaseAvailable ? <Pill tone="ok">● Free case today</Pill> : <Pill>Free case: used today</Pill>}
+        {player.freeCasesToday > 0 ? (
+          <Pill tone="ok">● {player.freeCasesToday === 1 ? 'Free case today' : `${player.freeCasesToday} free cases today`}</Pill>
+        ) : (
+          <Pill>Free cases: used today</Pill>
+        )}
         <Pill tone="tape">🗂️ {plural(player.caseCredits, 'extra case')}</Pill>
         <Pill>⚖️ {plural(player.items.subpoena, 'Subpoena')}</Pill>
         <Pill>🧭 {plural(player.items.trace, 'Trace')}</Pill>
@@ -112,7 +116,7 @@ export function Home() {
         <section className="mt-6 space-y-5 px-5">
           <Label>Open case files</Label>
           {cases.map((c, i) => (
-            <CaseCard key={c.id} c={c} index={i} />
+            <CaseCard key={c.id} c={c} index={i} startHere={nextCase?.startHere && nextCase.id === c.id} />
           ))}
         </section>
       )}

@@ -19,12 +19,17 @@ export function DexPanel({ room, run, busy, now }: PhaseProps) {
 
   useEffect(() => {
     if (!crew) endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
-  }, [crew, dex.messages.length])
+  }, [crew, dex.messages.length, room.tutorial?.reached.length])
 
   async function hint() {
     setConfirmHint(false)
     await run({ type: 'askDex', ask: 'hint' }, 'dexHint')
   }
+
+  // Tutorial rooms: the tips Dex has given so far sit in his log by the time each step was reached.
+  type Entry = (typeof dex.messages)[number] & { tip?: boolean }
+  const tips: Entry[] = (room.tutorial?.reached ?? []).map((r) => ({ text: room.tutorial!.tips[r.step], at: r.at, tip: true }))
+  const log: Entry[] = tips.length ? [...dex.messages, ...tips].sort((a, b) => a.at - b.at) : dex.messages
 
   let clueIndex = 0
   return (
@@ -35,11 +40,11 @@ export function DexPanel({ room, run, busy, now }: PhaseProps) {
           : "Dex holds the rest of the evidence. Ask and he'll show you, one piece at a time."}
       </p>
       <div className="mt-4 space-y-4">
-        {dex.messages.map((m, i) => (
+        {log.map((m, i) => (
           <div key={i} className="space-y-3">
             <div className="flex justify-start">
               <div className="paper max-w-[82%] animate-rise rounded-lg rounded-bl-sm px-3.5 py-2.5 font-type text-[15px] leading-snug">
-                <div className="mb-1 font-mono text-[10px] font-bold text-rug">🕵️ DEX</div>
+                <div className="mb-1 font-mono text-[10px] font-bold text-rug">🕵️ DEX{m.tip ? ' · TIP' : ''}</div>
                 {m.text}
               </div>
             </div>

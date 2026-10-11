@@ -464,7 +464,7 @@ describe('solo with Dex', () => {
 
       await new Promise((r) => setTimeout(r, 0))
       const events = write.mock.calls.flatMap(([batch]) => batch)
-      expect(events.find((e) => e.name === 'case_start' && e.props.code === code)?.props).toEqual({ caseId: 'mooncat-exit', mode: 'solo', seats: 1, code })
+      expect(events.find((e) => e.name === 'case_start' && e.props.code === code)?.props).toEqual({ caseId: 'mooncat-exit', mode: 'solo', seats: 1, code, tutorial: false })
       expect(events.filter((e) => e.name === 'dex_ask' && e.props.code === code).map((e) => e.props.ask)).toEqual(['clue', 'hint'])
     } finally {
       write.mockRestore()

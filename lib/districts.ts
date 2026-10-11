@@ -59,3 +59,23 @@ export function canPlay(player: Ranked, c: CaseKey) {
   const district = districtById(c.district)
   return !!district && isOpen(player, district)
 }
+
+/** Clue Points towards a district's unlock rank, for the map's progress bar. `have` stops at `need`. */
+export function unlockProgress(player: Ranked, district: Pick<District, 'unlockRank'>) {
+  const need = RANKS.find((r) => r.title === district.unlockRank)?.at ?? 0
+  return { have: Math.min(Math.max(0, player.cluePoints ?? 0), need), need }
+}
+
+type BoardCase = { id: string; district: string; played: boolean }
+
+/**
+ * Home's Next case card. With `tutorialId` (a player with no finished case) it's the tutorial
+ * case, marked "Start here"; otherwise the newest unplayed case in an open district, or null
+ * when they're all played. `cases` must be newest first.
+ */
+export function pickNextCase(cases: readonly BoardCase[], open: readonly string[], tutorialId?: string): { id: string; startHere: boolean } | null {
+  const tutorial = tutorialId ? cases.find((c) => c.id === tutorialId && open.includes(c.district)) : undefined
+  if (tutorial) return { id: tutorial.id, startHere: true }
+  const next = cases.find((c) => !c.played && open.includes(c.district))
+  return next ? { id: next.id, startHere: false } : null
+}
