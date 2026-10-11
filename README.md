@@ -44,6 +44,17 @@ Set `FLAGS=solo,daily` to turn feature flags on locally. CI (`.github/workflows/
    ```
    That registers the webhook (with the secret), the `/play` `/start` `/paysupport` commands, and the chat menu button.
 
+## New cases
+
+Cases live in the `cases` table; the three in `lib/cases/*.ts` are built in. New ones are drafted by a model, checked by a blind solver, and released by an admin (docs/phase-1/06-case-pipeline.md). Both scripts read `.env.local` and need `ANTHROPIC_API_KEY` and the Supabase keys.
+
+```bash
+npm run cases:draft -- --district memecoin-swamp --count 4   # draft, check, store passing ones as 'review'
+npm run cases:check -- <id> [--save]                         # re-run the checks on a stored or built-in case
+```
+
+Each case is a draft plus about 40 solver calls, and up to 2 revisions when the solver finds it unfair. That's a few dollars per case on `claude-opus-5-5` (the default for `CASE_MODEL` and `SOLVER_MODEL`), or about $0.20 with `CASE_MODEL=claude-haiku-5-5 SOLVER_MODEL=claude-haiku-5-5`, which the first batch used. An unscoped API key also needs `ANTHROPIC_WORKSPACE_ID`. Admins (`ADMIN_TELEGRAM_IDS`) review cases in the app: Home → Review, then playtest (free and unrated), approve with a release time and target, or reject.
+
 ## How the Telegram parts work
 
 | Feature | Where | Notes |

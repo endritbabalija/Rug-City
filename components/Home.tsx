@@ -7,7 +7,7 @@ import { useGame } from './GameContext'
 import { Button, Label, Pill, Stamp, Tape } from './ui'
 
 export function Home() {
-  const { player, cases, badges, flags, go, toast } = useGame()
+  const { player, cases, badges, flags, isAdmin, go, toast } = useGame()
   const [code, setCode] = useState('')
 
   const badge = player.activeBadge ? badges[player.activeBadge] : null
@@ -60,6 +60,11 @@ export function Home() {
         <button onClick={() => go({ name: 'shop' })} className="ml-3 font-display text-sm font-bold tracking-widest text-tape uppercase underline underline-offset-4">
           Shop ⭐
         </button>
+        {isAdmin && (
+          <button onClick={() => go({ name: 'admin' })} className="ml-3 font-display text-sm font-bold tracking-widest text-rug uppercase underline underline-offset-4">
+            Review
+          </button>
+        )}
       </section>
 
       {flags.districts ? (

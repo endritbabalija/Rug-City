@@ -112,6 +112,10 @@ export function Reveal({ room, now }: PhaseProps) {
         )}
       </div>
 
+      {room.playtest && (
+        <p className="mx-4 mb-5 rounded-md border border-dashed border-line px-4 py-3 font-mono text-xs text-dim">Playtest: no Clue Points, rating or result recorded.</p>
+      )}
+
       {(award || waiting) && (
         <section className="mx-4 mb-5 animate-rise rounded-md border border-tape/40 bg-tape/10 p-4" style={{ animationDelay: '550ms' }}>
           {!award ? (

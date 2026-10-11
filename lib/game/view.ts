@@ -40,6 +40,7 @@ export const DEX_CREW_OPENER = "Dex here. I'll put my notes on the table for the
 export interface RoomView {
   code: string
   mode: CaseMode
+  playtest: boolean
   phase: Phase
   phaseStartedAt: number
   serverNow: number
@@ -132,6 +133,7 @@ export function buildView(state: RoomState, c: CaseFile, playerId: number, now: 
   return {
     code: state.code,
     mode: roomMode(state),
+    playtest: !!state.playtest,
     phase: state.phase,
     phaseStartedAt: state.phaseStartedAt,
     serverNow: now,

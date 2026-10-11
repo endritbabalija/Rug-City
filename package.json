@@ -10,6 +10,8 @@
     "test": "vitest run",
     "bot:setup": "node --env-file-if-exists=.env.local scripts/setup-bot.mjs",
     "preview:point": "node scripts/point-preview.mjs",
+    "cases:draft": "tsx --env-file-if-exists=.env.local scripts/cases/draft.ts",
+    "cases:check": "tsx --env-file-if-exists=.env.local scripts/cases/check.ts",
     "lint": "eslint ."
   },
   "dependencies": {
@@ -30,6 +32,7 @@
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.4.0",
     "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.15",
     "typescript": "5.9.3",
     "vitest": "^5.0.3"
   }

@@ -7,6 +7,7 @@ import type { Sku } from '@/lib/catalog'
 import type { PublicPlayer } from '@/lib/server'
 import { bindBackButton, haptic, initTelegram, openInvoice } from '@/lib/telegram/webapp'
 import { GameContext, type GameCtx, type Screen } from './GameContext'
+import { CaseReview, CaseReviewList } from './admin/CaseReview'
 import { District } from './District'
 import { Home } from './Home'
 import { Leaderboard } from './Leaderboard'
@@ -23,6 +24,7 @@ interface MeResponse {
   skus: Sku[]
   badges: GameCtx['badges']
   flags: GameCtx['flags']
+  isAdmin: boolean
 }
 
 interface Toast {
@@ -113,6 +115,7 @@ export function Game() {
             skus: me.skus,
             badges: me.badges,
             flags: me.flags,
+            isAdmin: me.isAdmin,
             go: setScreen,
             toast,
             buy,
@@ -149,6 +152,8 @@ export function Game() {
         {screen.name === 'profile' && <Profile />}
         {screen.name === 'leaderboard' && <Leaderboard />}
         {screen.name === 'district' && <District key={screen.id} id={screen.id} />}
+        {screen.name === 'admin' && ctx.isAdmin && <CaseReviewList />}
+        {screen.name === 'adminCase' && ctx.isAdmin && <CaseReview key={screen.id} id={screen.id} />}
         {screen.name === 'room' && <Room key={screen.code} code={screen.code} />}
       </main>
       <div className="pointer-events-none fixed inset-x-0 top-0 z-50 flex flex-col items-center gap-2 p-3 safe-top">
