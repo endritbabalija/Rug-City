@@ -19,6 +19,7 @@ Rate limits on every costly or farmable route, too-fast finishes caught, and a h
 3. **AI budget.** Bucket `ai_day` with `AI_DAILY_BUDGET` per UTC day. When it's exceeded, suspects and Dex answer with their scripted fallback instead of an error.
 4. **Too-fast finishes.** New `Unrated` reason `'too-fast'`: elapsed below `max(MIN_SOLVE_SEC, MIN_SOLVE_SHARE × target)` (or `case_stats.min_sec` once set). The result is saved unrated; event `cheat_flag` with case, mode, elapsed and target.
 5. **AI cost.** `ai_call` events get `costUsd` from per-model price constants in `lib/ai/pricing.ts`.
+6. **Daily soft cap across modes** (Game Design → Guardrails). Today's cap is `RATED_PER_DAY` rated cases plus one Daily. Add `maxCluePointsPerDay()` in `lib/game/progress.ts` that derives the most Clue Points one UTC day can pay from those constants (cases at full points and streak, plus `DAILY_POINTS`). Any new Clue Points source must be counted in it.
 
 ## Tests
 
@@ -26,6 +27,7 @@ Rate limits on every costly or farmable route, too-fast finishes caught, and a h
 - A finish under the minimum is unrated and records `cheat_flag`.
 - Past the AI budget, replies are scripted and no model call is made (mock the SDK).
 - Rate-limited routes return 429 with the error shape from `errorResponse`.
+- Playing past `RATED_PER_DAY` and the Daily in one UTC day never earns more than `maxCluePointsPerDay()`.
 
 ## Done when
 

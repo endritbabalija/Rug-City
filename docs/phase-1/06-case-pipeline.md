@@ -20,6 +20,7 @@ AI drafts new Memecoin Swamp cases in the `CaseFile` format, a blind solver reje
 3. **Check** (both must pass):
    - **Static:** the checks in `tests/cases.test.ts` (answer ids exist, every clue dealt, no single seat holds a `culpritProofs` set for 3–6 seats).
    - **Blind solver:** a separate model call gets public case data, the explorer and one or more clue hands, and must answer culprit, motive and trail. With all clues it must get all three right. With any single hand at 3+ seats it must not name the culprit with confidence. Run each check twice.
+   - **Interrogation needed** (Game Design → Guardrails: decisive clues come from live interrogation, so a case can't be pasted into a chatbot): with all clues and the explorer but no suspect chats, the solver must not get all three right. At least one of culprit, motive or trail must depend on something a suspect only gives up under questioning (their `truth`). Record which one in the solver report.
    - Suggest `targetSec` = 60 s × clues + 90 s × suspects (rounded); Endrit adjusts it in review.
 4. **Insert** passing cases as `status: 'review'` with the solver report in `data.review`.
 5. **Admin API** `app/api/admin/cases/route.ts` and `[id]/route.ts`: list by status, get, approve (`release_at`, `targetSec`), reject. Checked against `env().adminIds`; 403 otherwise.
@@ -29,6 +30,7 @@ AI drafts new Memecoin Swamp cases in the `CaseFile` format, a blind solver reje
 ## Tests
 
 - The three built-ins pass the static checks and the schema (the solver isn't run in CI).
+- Run the interrogation check on the three built-ins once by hand. If any of them fails it, report which and ask before changing them; don't rewrite them.
 - Admin routes return 403 for non-admins.
 - Playtest rooms charge nothing and write no rated result.
 

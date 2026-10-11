@@ -7,7 +7,7 @@ While there are no real players, preview deploys and production share the **same
 | | Local | Preview | Production |
 | --- | --- | --- | --- |
 | Store | In-memory (no Supabase vars) | The Supabase project | The Supabase project |
-| Telegram bot | None (`DEV_AUTH=1`) | Optional test bot pointed at the branch URL | Production bot |
+| Telegram bot | None (`DEV_AUTH=1`) | `@WhoRuggedBot`'s second Mini App, `t.me/WhoRuggedBot/preview` | `@WhoRuggedBot`, `t.me/WhoRuggedBot/Play` |
 | Deploys from | `npm run dev` | Vercel Preview (every branch) | `main` |
 | Env vars | `.env.local` | Vercel → Preview | Vercel → Production |
 | Feature flags | `FLAGS=a,b` | `feature_flags` table (shared) | `feature_flags` table (shared) |
@@ -42,12 +42,21 @@ npm run dev
 
 Every pushed branch gets a Preview deploy on the shared database.
 
-**One-time setup**
+**How previews open in Telegram**
 
-1. **Vercel → Settings → Environment Variables:** tick **Preview** on `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY` and `ADMIN_TELEGRAM_IDS` (same values as Production). Leave `DEV_AUTH` and `FLAGS` unset.
-2. **Optional test bot,** to play a branch inside Telegram: create a bot in @BotFather, register its Mini App with `/newapp` pointing at the branch URL (`<project>-git-<branch>-<team>.vercel.app`), and set its `TELEGRAM_BOT_TOKEN`, `NEXT_PUBLIC_BOT_USERNAME`, `NEXT_PUBLIC_APP_SHORT_NAME`, `TELEGRAM_WEBHOOK_SECRET` and `APP_URL` for Preview only. Without a test bot, check branches locally and merge to try them in the production bot.
+The production bot has two Mini Apps. `Play` opens production; `preview` opens the fixed address `who-rugged-preview.vercel.app`, which `npm run preview:point` moves to whichever branch is under test. It's the same bot, so its token validates Telegram logins on previews too.
 
-**Checking a branch:** apply its new migration (below), push the branch, wait for the Preview deploy, open it through the test bot. Turn on the slice's flag in `feature_flags`.
+- **Vercel → Environment Variables → Preview** (set 2026-10-11): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, `ADMIN_TELEGRAM_IDS`, `TELEGRAM_BOT_TOKEN` and `NEXT_PUBLIC_BOT_USERNAME` (same values as Production), and `NEXT_PUBLIC_APP_SHORT_NAME=preview` so invite links made in a preview open the preview. Leave `DEV_AUTH` and `FLAGS` unset. Preview has no `APP_URL` or webhook secret: the bot's webhook stays on production.
+- **Deployment Protection is off** (Vercel → Settings → Deployment Protection, turned off 2026-10-11). Telegram Web and Desktop run Mini Apps in an iframe, where the browser drops Vercel's protection cookie, so a protected preview never gets past "Opening case files…". The game's own auth still guards every API call (signed Telegram init data; `DEV_AUTH` is ignored on deployed builds).
+- **@BotFather** → `/newapp` on `@WhoRuggedBot`, short name `preview`, URL `https://who-rugged-preview.vercel.app/` (created 2026-10-11; its URL still carries an old `x-vercel-protection-bypass` query, which is now harmless). It never needs changing.
+
+**Checking a branch:**
+1. Apply its new migration (below) and push the branch.
+2. When Vercel's Preview deploy is ready: `npm run preview:point -- <branch>` (defaults to the current branch).
+3. Turn on the slice's flag in `feature_flags`.
+4. Open `t.me/WhoRuggedBot/preview` in Telegram and play it. Crew friends join with the case code or a preview invite link.
+
+**Careful:** previews run as the real bot on the shared database. A Stars purchase made in a preview is real and is paid to the production webhook.
 
 ## Production
 

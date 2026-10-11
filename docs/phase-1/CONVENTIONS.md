@@ -35,7 +35,7 @@ Rules every agent follows when building a Phase 1 slice. When a brief and this f
 ## Done checks
 
 14. `npm run typecheck && npm run lint && npm test && npm run build` all pass (`lint` exists from slice 0 on).
-15. The feature works on a preview deploy (inside Telegram through the test bot, or locally if there is none), with its flag switched on.
+15. The feature works on the branch's preview deploy inside Telegram, with its flag switched on: `npm run preview:point -- <branch>`, then open `t.me/WhoRuggedBot/preview` (`docs/ops/environments.md` → Preview). Do this before merging.
 16. New env vars are in `.env.example`; `README.md` is updated when setup changes.
 17. The status table in `docs/phase-1/README.md` is updated.
 
