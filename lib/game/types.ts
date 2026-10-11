@@ -36,17 +36,48 @@ export interface Vote {
   trail: string
 }
 
+export type CaseMode = 'solo' | 'crew'
+
+/** How many times the room used each kind of help. Every use lowers every seat's case score. */
+export interface Help {
+  hint: number
+  trace: number
+  subpoena: number
+  dexHint: number
+}
+
 export interface RoomResult {
   group: Vote
   correct: { culprit: boolean; motive: boolean; trail: boolean }
+  /** Points before the help penalty. */
   points: { culprit: number; motive: number; trail: number; time: number }
+  /** Share of the score the room's help cost (0 to HELP_PENALTY_CAP). */
+  penalty: number
+  /** After the penalty. */
   score: number
   elapsedSec: number
+  /** The time the case was scored against. */
+  targetSec: number
+  help: Help
+}
+
+/** One `case_stats` row: how a case plays in one mode. */
+export interface CaseStats {
+  caseId: string
+  mode: CaseMode
+  targetSec?: number
+  /** Median solve time, recalculated weekly (slice 10). */
+  medianSec?: number
+  minSec?: number
+  plays: number
+  updatedAt: number
 }
 
 export interface RoomState {
   code: string
   caseId: string
+  /** Missing on rooms created before solo rooms existed: those are 'crew'. */
+  mode?: CaseMode
   hostId: number
   createdAt: number
   phase: Phase
@@ -61,20 +92,20 @@ export interface RoomState {
   subpoenas: Record<string, boolean>
   traced: string[]
   hintsRevealed: number
+  /** Missing on rooms created before help penalties. */
+  help?: Help
   feed: FeedItem[]
   votes: Record<string, Vote>
   investigateStartedAt?: number
   result?: RoomResult
   /** Players whose referral rewards were already settled by this room. */
   rewardsSettled?: boolean
-  /** Someone used a power-up, so this case doesn't count toward season ratings. */
-  assisted?: boolean
   /** Clue Points each seat earned, written once when the room settles. key = player id */
   awards?: Record<string, Award>
 }
 
 /** Why a finished case earned no Clue Points. */
-export type Unrated = 'solo' | 'no-vote' | 'replay' | 'daily-cap'
+export type Unrated = 'no-vote' | 'replay' | 'daily-cap'
 
 export interface Award {
   unrated?: Unrated
@@ -82,7 +113,6 @@ export interface Award {
   total: number
   /** This case's score toward the season rating, when it counted. */
   rating?: number
-  assisted?: boolean
   streakDays: number
   /** New rank title, when this case pushed the player over a threshold. */
   rankUp?: string

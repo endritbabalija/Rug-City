@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { mooncat } from '@/lib/cases/mooncat'
-import { score } from '@/lib/game/engine'
+import { score as engineScore } from '@/lib/game/engine'
 import {
   applyAward,
   awardCase,
@@ -13,7 +13,8 @@ import {
   seasonRating,
   type CaseOutcome,
 } from '@/lib/game/progress'
-import type { Vote } from '@/lib/game/types'
+import { NO_HELP } from '@/lib/game/scoring'
+import type { Help, Vote } from '@/lib/game/types'
 import { newPlayer, type Player } from '@/lib/player'
 import { SEASON_SEED } from '@/lib/store/memory'
 
@@ -26,10 +27,10 @@ function outcome(over: Partial<CaseOutcome> = {}): CaseOutcome {
   return {
     code: 'ABCDE',
     caseFile: mooncat,
+    mode: 'crew',
     seats: 4,
     vote: right,
-    result: score(mooncat, right, 9 * 60),
-    assisted: false,
+    result: score(right, 9 * 60),
     now: NOW,
     alreadyPlayed: false,
     seasonScores: [],
@@ -37,14 +38,19 @@ function outcome(over: Partial<CaseOutcome> = {}): CaseOutcome {
   }
 }
 const fresh = (): Player => newPlayer({ id: 1, name: 'Ana' }, NOW)
+/** The crew's verdict for a vote, against the case's own target. */
+const score = (vote: Vote, elapsedSec: number, help: Help = NO_HELP) => engineScore(mooncat, vote, elapsedSec, mooncat.targetSec, help)
 
 describe('ranks', () => {
   it('climbs at the thresholds', () => {
-    expect(rankFor(0).title).toBe('Rookie')
-    expect(rankFor(249).title).toBe('Rookie')
-    expect(rankFor(250).title).toBe('Sleuth')
-    expect(rankFor(1000)).toMatchObject({ title: 'Inspector', next: { title: 'Chief Inspector', at: 3000 } })
-    expect(rankFor(1_000_000)).toMatchObject({ title: 'Chief', next: null })
+    expect(rankFor(0)).toMatchObject({ title: 'Rookie', next: { title: 'Inspector', at: 500 } })
+    expect(rankFor(499).title).toBe('Rookie')
+    expect(rankFor(500)).toMatchObject({ title: 'Inspector', next: { title: 'Chief', at: 2500 } })
+    expect(rankFor(2499).title).toBe('Inspector')
+    expect(rankFor(2500)).toMatchObject({ title: 'Chief', next: { title: 'Legend', at: 10_000 } })
+    expect(rankFor(9999).title).toBe('Chief')
+    expect(rankFor(10_000)).toMatchObject({ title: 'Legend', next: null })
+    expect(rankFor(1_000_000).title).toBe('Legend')
   })
 })
 
@@ -90,15 +96,23 @@ describe('awardCase', () => {
   })
 
   it('scores your own vote even when the crew voted differently', () => {
-    const crewRight = score(mooncat, right, 9 * 60)
+    const crewRight = score(right, 9 * 60)
     const { award } = awardCase(fresh(), outcome({ vote: wrongMotive, result: crewRight }))
     expect(award.points.motive).toBe(0)
     expect(award.points.crew).toBe(10)
-    expect(award.rating).toBe(score(mooncat, wrongMotive, 9 * 60).score)
+    expect(award.rating).toBe(score(wrongMotive, 9 * 60).score)
   })
 
-  it('gives nothing for solo games, missing votes and replays, but still records the case', () => {
-    expect(awardCase(fresh(), outcome({ seats: 1 })).award).toMatchObject({ unrated: 'solo', total: 0 })
+  it('rates solo-sized and crew rooms alike, and records the mode', () => {
+    for (const seats of [1, 2, 3, 6]) {
+      const { award } = awardCase(fresh(), outcome({ seats }))
+      expect(award.unrated).toBeUndefined()
+      expect(award).toMatchObject({ total: 85, rating: 120 })
+    }
+    expect(awardCase(fresh(), outcome({ seats: 1, mode: 'solo' })).result).toMatchObject({ mode: 'solo', seats: 1, rating: 120 })
+  })
+
+  it('gives nothing for missing votes and replays, but still records the case', () => {
     const noVote = awardCase(fresh(), outcome({ vote: undefined }))
     expect(noVote.award.unrated).toBe('no-vote')
     expect(noVote.result).toMatchObject({ caseId: mooncat.id, total: 0, unrated: 'no-vote' })
@@ -134,17 +148,34 @@ describe('awardCase', () => {
     expect(awardCase(p, outcome({ now: NOW + 9 * DAY })).award.streakDays).toBe(1)
   })
 
-  it('keeps power-up cases out of the season rating but still pays Clue Points', () => {
-    const { award, result, ratingChanged } = awardCase(fresh(), outcome({ assisted: true }))
-    expect(award.total).toBe(85)
-    expect(award.rating).toBeUndefined()
-    expect(ratingChanged).toBe(false)
-    expect(result.rating).toBeUndefined()
+  it('rates aided cases with the penalty, and cuts their case Clue Points but not the bonuses', () => {
+    const traced = score(right, 9 * 60, { ...NO_HELP, trace: 1 })
+    const { award, result, ratingChanged } = awardCase(fresh(), outcome({ result: traced }))
+    expect(award.rating).toBe(102)
+    expect(result).toMatchObject({ score: 102, rating: 102 })
+    expect(ratingChanged).toBe(true)
+    // 85% of 30, 15, 15 and 10, rounded; crew and streak untouched.
+    expect(award.points).toEqual({ culprit: 26, motive: 13, trail: 13, crew: 10, speed: 9, streak: 5 })
+    expect(award.total).toBe(76)
+  })
+
+  it('applies the room’s help to every seat, whatever their own vote', () => {
+    const help = { ...NO_HELP, subpoena: 1 }
+    const { award } = awardCase(fresh(), outcome({ vote: wrongMotive, result: score(right, 9 * 60, help) }))
+    expect(award.rating).toBe(score(wrongMotive, 9 * 60, help).score)
+    expect(award.rating).toBe(Math.round(95 * 0.75))
+  })
+
+  it('always rates a clean solve above an aided one with the same answers and time', () => {
+    const clean = awardCase(fresh(), outcome()).award
+    const aided = awardCase(fresh(), outcome({ result: score(right, 9 * 60, { ...NO_HELP, hint: 1 }) })).award
+    expect(clean.rating!).toBeGreaterThan(aided.rating!)
+    expect(clean.total).toBeGreaterThan(aided.total)
   })
 
   it('keeps only the best scores and starts fresh each season', () => {
     const scores = Array.from({ length: RATING_BEST_OF }, () => 100)
-    const low = awardCase(fresh(), outcome({ vote: wrongMotive, result: score(mooncat, wrongMotive, 9 * 60), seasonScores: scores }))
+    const low = awardCase(fresh(), outcome({ vote: wrongMotive, result: score(wrongMotive, 9 * 60), seasonScores: scores }))
     expect(seasonRating([...scores, low.award.rating!])).toEqual(seasonRating(scores))
     expect(low.ratingChanged).toBe(false)
     const high = awardCase(fresh(), outcome({ seasonScores: scores }))
@@ -156,9 +187,12 @@ describe('awardCase', () => {
     expect(seasonRating([nextSeason.award.rating!])).toEqual({ rating: 120, cases: 1 })
   })
 
-  it('announces a rank-up', () => {
-    expect(awardCase({ ...fresh(), cluePoints: 240 }, outcome()).award.rankUp).toBe('Sleuth')
+  it('announces a rank-up across each threshold', () => {
+    expect(awardCase({ ...fresh(), cluePoints: 450 }, outcome()).award.rankUp).toBe('Inspector')
+    expect(awardCase({ ...fresh(), cluePoints: 2450 }, outcome()).award.rankUp).toBe('Chief')
+    expect(awardCase({ ...fresh(), cluePoints: 9950 }, outcome()).award.rankUp).toBe('Legend')
     expect(awardCase({ ...fresh(), cluePoints: 10 }, outcome()).award.rankUp).toBeUndefined()
+    expect(awardCase({ ...fresh(), cluePoints: 500 }, outcome()).award.rankUp).toBeUndefined()
   })
 
   it('adds an award to the freshest player row, so concurrent settles both count', () => {

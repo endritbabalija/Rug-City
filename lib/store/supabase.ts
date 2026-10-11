@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { Season } from '../game/progress'
-import type { CaseResultRow, RoomState } from '../game/types'
+import type { CaseResultRow, CaseStats, RoomState } from '../game/types'
 import type { Player } from '../player'
 import { CONFLICT, withRetries, type ChatRow, type Purchase, type PurchaseStatus, type SeasonRating, type Store } from './types'
 
@@ -98,6 +98,26 @@ const toResult = (r: CaseResultDbRow): CaseResultRow => ({
   elapsedSec: r.elapsed_sec ?? undefined,
   unrated: r.unrated ?? undefined,
   at: Date.parse(r.at),
+})
+
+interface CaseStatsRow {
+  case_id: string
+  mode: CaseStats['mode']
+  target_sec: number | null
+  median_sec: number | null
+  min_sec: number | null
+  plays: number
+  updated_at: string
+}
+
+const toCaseStats = (r: CaseStatsRow): CaseStats => ({
+  caseId: r.case_id,
+  mode: r.mode,
+  targetSec: r.target_sec ?? undefined,
+  medianSec: r.median_sec ?? undefined,
+  minSec: r.min_sec ?? undefined,
+  plays: r.plays,
+  updatedAt: Date.parse(r.updated_at),
 })
 
 interface ChatDbRow {
@@ -327,6 +347,15 @@ export function createSupabaseStore(url: string, serviceKey: string): Store {
     async getSeasons() {
       const rows = check(await db.from('seasons').select('id, starts_at, ends_at')) as { id: number; starts_at: string; ends_at: string }[]
       return rows.map((r) => ({ id: r.id, start: Date.parse(r.starts_at), end: Date.parse(r.ends_at) }))
+    },
+
+    async getCaseStats(caseId, mode) {
+      const row = check(await db.from('case_stats').select('*').match({ case_id: caseId, mode }).maybeSingle()) as CaseStatsRow | null
+      return row ? toCaseStats(row) : null
+    },
+    async bumpPlays(caseId, mode) {
+      // An upsert in one statement (0005_case_stats.sql), so concurrent finishes all count.
+      check(await db.rpc('bump_case_plays', { p_case_id: caseId, p_mode: mode }))
     },
 
     async createRoom(state) {

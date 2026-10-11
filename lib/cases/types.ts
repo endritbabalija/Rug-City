@@ -103,4 +103,6 @@ export interface CaseFile {
   answer: { culprit: string; motive: string; trail: string }
   hints: string[]
   reveal: string[]
+  /** Target solve time in seconds, until the case has enough plays for a median (`targetFor`). */
+  targetSec: number
 }

@@ -373,4 +373,6 @@ export const audit: CaseFile = {
     'He hopped the funds through two wallets and locked 300,000 TON in LockBox #883 for lumen-alt.ton: his own savings wallet from his old handle.',
     'CertiSure was lazy (their report really was copy-pasted) but they audited a commit that had no backdoor.',
   ],
+  // 15 minutes until playtests give a better number.
+  targetSec: 900,
 }

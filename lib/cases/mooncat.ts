@@ -360,4 +360,6 @@ export const mooncat: CaseFile = {
     'At 03:07 he pulled 48,200 TON, split it across the four wallets and sent it all back to his FrostEx deposit address.',
     'Gary sold because of a public alert, not inside info. Whiskers was at a wedding. The team had already been paid in full.',
   ],
+  // 15 minutes until playtests give a better number.
+  targetSec: 900,
 }

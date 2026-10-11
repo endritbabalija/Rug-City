@@ -1,12 +1,14 @@
 'use client'
 
 import { api, ApiError } from '@/lib/client/api'
-import { POINTS, RATED_MIN_SEATS, RATED_PER_DAY, RATING_BEST_OF, RANKS, REFERRAL_POINTS } from '@/lib/game/progress'
+import { POINTS, RATED_PER_DAY, RATING_BEST_OF, RANKS, REFERRAL_POINTS } from '@/lib/game/progress'
+import { HELP_PENALTY, HELP_PENALTY_CAP, PENALIZE_CLUE_POINTS } from '@/lib/game/scoring'
 import type { PublicPlayer } from '@/lib/server'
 import { useGame } from './GameContext'
 import { Button, Label, Pill, Tape } from './ui'
 
 const DAY_MS = 86_400_000
+const percent = (share: number) => `${Math.round(share * 100)}%`
 
 export function Profile() {
   const { player, badges, go, setPlayer, toast } = useGame()
@@ -77,7 +79,7 @@ export function Profile() {
           </div>
         </div>
         <p className="mt-3 font-type text-sm leading-snug">
-          Your rating is your best {RATING_BEST_OF} cases this season: your own vote&apos;s accuracy plus speed. Cases where your crew used a power-up don&apos;t count.
+          Your rating is your best {RATING_BEST_OF} cases this season: your own vote&apos;s accuracy plus speed against the case&apos;s target time, solo or with a crew. Help lowers the score instead of voiding it.
         </p>
         <Button variant="ghost" className="mt-4 w-full" onClick={() => go({ name: 'leaderboard' })}>
           Season leaderboard
@@ -142,7 +144,12 @@ export function Profile() {
           </li>
           <li>Invite a friend: +{REFERRAL_POINTS} when they finish their first rated case.</li>
           <li>
-            Only your first time through a case counts, with a crew of {RATED_MIN_SEATS} or more, up to {RATED_PER_DAY} cases a day.
+            Help lowers everyone&apos;s case score: Hint −{percent(HELP_PENALTY.hint)}, Trace −{percent(HELP_PENALTY.trace)}, Subpoena −{percent(HELP_PENALTY.subpoena)}, Dex hint −
+            {percent(HELP_PENALTY.dexHint)}, up to −{percent(HELP_PENALTY_CAP)} in all.
+            {PENALIZE_CLUE_POINTS && ' It cuts your culprit, motive, money trail and speed points too.'}
+          </li>
+          <li>
+            Only your first time through a case counts, up to {RATED_PER_DAY} cases a day.
           </li>
         </ul>
         <p className="mt-4 text-xs text-dim">Clue Points and ratings are bragging rights. They can&apos;t be bought, have no cash value and never turn into a token.</p>

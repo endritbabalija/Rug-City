@@ -10,6 +10,7 @@ import { env } from './env'
 import * as engine from './game/engine'
 import { GameError } from './game/engine'
 import { applyAward, awardCase, REFERRAL_POINTS, seasonRating } from './game/progress'
+import { targetFor } from './game/scoring'
 import type { Award, ChatMessage, RoomState, Vote } from './game/types'
 import { buildView } from './game/view'
 import { applyGrant, consumeCase, hasFreeCase, spendItem, type Player } from './player'
@@ -97,6 +98,16 @@ async function chargedStep(
   }
 }
 
+/** The case's target time in the room's mode, for the vote that may end it. */
+async function targetOf(code: string) {
+  const { room, caseFile } = await loadRoom(code)
+  // Stats are bookkeeping: if they can't be read, score against the case's own target rather than block the vote.
+  const stats = await store()
+    .getCaseStats(caseFile.id, engine.roomMode(room))
+    .catch((err) => (console.error('Case stats read failed', code, err), null))
+  return targetFor(stats, caseFile)
+}
+
 function itemCharge(item: ItemKey) {
   return [(p: Player) => spendItem(p, item), (p: Player) => applyGrant(p, { items: { [item]: 1 } }).player] as const
 }
@@ -143,10 +154,14 @@ export async function act(code: string, player: Player, action: RoomAction) {
       return mutate(code, (s, _c, now) => engine.skipBriefing(s, player.id, now))
     case 'callVote':
       return mutate(code, (s, _c, now) => engine.callVote(s, player.id, now))
-    case 'vote':
-      return settleAfter(await mutate(code, (s, c, now) => engine.castVote(s, c, player.id, action.vote, now)))
-    case 'closeVote':
-      return settleAfter(await mutate(code, (s, c, now) => engine.closeVote(s, c, player.id, now)))
+    case 'vote': {
+      const targetSec = await targetOf(code)
+      return settleAfter(await mutate(code, (s, c, now) => engine.castVote(s, c, player.id, action.vote, now, targetSec)))
+    }
+    case 'closeVote': {
+      const targetSec = await targetOf(code)
+      return settleAfter(await mutate(code, (s, c, now) => engine.closeVote(s, c, player.id, now, targetSec)))
+    }
     case 'hint':
       return chargedStep(code, player, ...itemCharge('hint'), (s, c, now) => engine.revealHint(s, c, player.id, now))
     case 'trace':
@@ -210,6 +225,10 @@ export async function settleAfter(state: RoomState) {
 
   const caseFile = requireCase(settled.caseId)
   const now = Date.now()
+  // Counted once per room, after the claim. A missed count only delays the switch to the median.
+  await store()
+    .bumpPlays(caseFile.id, engine.roomMode(settled))
+    .catch((err) => console.error('Case plays count failed', settled.code, err))
   const awards: Record<string, Award> = {}
   await Promise.all(
     settled.seats.map(async (id) => {
@@ -236,10 +255,10 @@ async function settleSeat(room: RoomState, caseFile: CaseFile, id: number, now: 
   const { award, result, ratingChanged } = awardCase(before, {
     code: room.code,
     caseFile,
+    mode: engine.roomMode(room),
     seats: room.seats.length,
     vote: room.votes[String(id)],
     result: room.result!,
-    assisted: !!room.assisted,
     now,
     alreadyPlayed,
     seasonScores,

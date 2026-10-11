@@ -15,6 +15,10 @@ describe.each(CASES.map((c) => [c.title, c] as const))('%s', (_title, c) => {
     expect([...c.dealOrder].sort()).toEqual([...clueIds].sort())
   })
 
+  it('has a target time', () => {
+    expect(Number.isInteger(c.targetSec) && c.targetSec > 0).toBe(true)
+  })
+
   it('has a valid answer', () => {
     expect(suspectIds.has(c.answer.culprit)).toBe(true)
     expect(c.motives.some((m) => m.id === c.answer.motive)).toBe(true)
