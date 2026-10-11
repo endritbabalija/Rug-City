@@ -47,8 +47,8 @@ Every pushed branch gets a Preview deploy on the shared database.
 The production bot has two Mini Apps. `Play` opens production; `preview` opens the fixed address `who-rugged-preview.vercel.app`, which `npm run preview:point` moves to whichever branch is under test. It's the same bot, so its token validates Telegram logins on previews too.
 
 - **Vercel → Environment Variables → Preview** (set 2026-10-11): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, `ADMIN_TELEGRAM_IDS`, `TELEGRAM_BOT_TOKEN` and `NEXT_PUBLIC_BOT_USERNAME` (same values as Production), and `NEXT_PUBLIC_APP_SHORT_NAME=preview` so invite links made in a preview open the preview. Leave `DEV_AUTH` and `FLAGS` unset. Preview has no `APP_URL` or webhook secret: the bot's webhook stays on production.
-- **Deployment Protection** stays on for previews. The `preview` Mini App's URL carries the project's Protection Bypass for Automation secret (`?x-vercel-protection-bypass=…&x-vercel-set-bypass-cookie=samesitenone`), which sets a cookie so the app and its API load inside Telegram. The secret is in Vercel → Settings → Deployment Protection.
-- **@BotFather** → `/newapp` on `@WhoRuggedBot`, short name `preview`, URL `https://who-rugged-preview.vercel.app/` plus the bypass query above. It never needs changing.
+- **Deployment Protection is off** (Vercel → Settings → Deployment Protection, turned off 2026-10-11). Telegram Web and Desktop run Mini Apps in an iframe, where the browser drops Vercel's protection cookie, so a protected preview never gets past "Opening case files…". The game's own auth still guards every API call (signed Telegram init data; `DEV_AUTH` is ignored on deployed builds).
+- **@BotFather** → `/newapp` on `@WhoRuggedBot`, short name `preview`, URL `https://who-rugged-preview.vercel.app/` (created 2026-10-11; its URL still carries an old `x-vercel-protection-bypass` query, which is now harmless). It never needs changing.
 
 **Checking a branch:**
 1. Apply its new migration (below) and push the branch.
