@@ -1,167 +1,35 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import type { RoomData } from '@/hooks/useRoom'
-import { api, ApiError } from '@/lib/client/api'
-import { lastRoom, rememberRoom } from '@/lib/client/lastRoom'
-import { CaseCard } from './CaseCard'
-import { DistrictMap } from './District'
-import { useGame } from './GameContext'
-import { Button, Label, Pill, Stamp, Tape } from './ui'
+import type { PublicPlayer } from '@/lib/server'
+import { Label, Stamp, Tape } from './ui'
 
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
-
-/** The case this player left mid-way, if it's still running and they're in it. */
-function useOpenCase() {
-  const [open, setOpen] = useState<string | null>(null)
-  useEffect(() => {
-    const code = lastRoom()
-    if (!code) return
-    let cancelled = false
-    api<RoomData>(`/api/rooms/${code}`)
-      .then((room) => {
-        const running = room.member && room.phase !== 'reveal'
-        if (!running) rememberRoom(null)
-        if (!cancelled) setOpen(running ? code : null)
-      })
-      .catch((e: unknown) => {
-        // Gone or never ours: forget it. A network error keeps it for next time.
-        if (e instanceof ApiError && e.status === 404) rememberRoom(null)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-  return open
-}
-
-export function Home() {
-  const { player, cases, nextCase, badges, flags, isAdmin, go, toast } = useGame()
-  const [code, setCode] = useState('')
-  const openCase = useOpenCase()
-
-  const badge = player.activeBadge ? badges[player.activeBadge] : null
-  const { season } = player.progress
-  // eslint-disable-next-line react-hooks/purity -- a day-granularity countdown; re-render drift doesn't matter
-  const seasonDays = Math.max(0, Math.ceil((season.endsAt - Date.now()) / 86_400_000))
-
+/** Placeholder until The Refund (Rug City — The Refund Brief.md) adds its entry card here. */
+export function Home({ player }: { player: PublicPlayer }) {
   return (
     <div className="pb-10">
       <Tape>Crime scene · do not cross</Tape>
 
-      {openCase && (
-        <button
-          onClick={() => go({ name: 'room', code: openCase })}
-          className="mx-5 mt-4 block w-[calc(100%-2.5rem)] animate-rise rounded-md border border-rug bg-rug/15 px-4 py-3 text-left font-mono text-sm text-paper"
-        >
-          Case {openCase} in progress · <span className="font-semibold text-tape">Back to it ›</span>
-        </button>
-      )}
-
       <header className="relative px-5 pt-8 pb-6">
-        <button onClick={() => go({ name: 'profile' })} className="font-mono text-xs text-dim">
-          {player.progress.rank.title.toUpperCase()} {badge ? `${badge.icon} ` : ''}
-          {player.name.toUpperCase()} · <span className="text-tape">{player.progress.cluePoints.toLocaleString()} Clue Points ›</span>
-        </button>
+        <p className="font-mono text-xs text-dim">DETECTIVE {player.name.toUpperCase()}</p>
         <h1 className="mt-2 font-display text-[4.6rem] leading-[0.82] font-black uppercase">
-          Who
+          Rug
           <br />
-          <span className="relative inline-block">
-            Rugged
-            <span className="absolute -top-2 -right-9 text-rug">?</span>
-          </span>
+          City
         </h1>
         <p className="mt-4 max-w-sm text-[15px] leading-snug text-paper/80">
-          A project just got rugged. Work out <b className="text-tape">who</b>, <b className="text-tape">why</b>, and{' '}
-          <b className="text-tape">where the money went</b>, solo with Dex or with your crew.
+          Uncover the human choices behind crypto scandals, and <b className="text-tape">prove what happened with evidence</b>.
         </p>
         <div className="absolute top-10 right-5">
-          <Stamp className="text-lg">Case open</Stamp>
+          <Stamp className="text-lg">Opening soon</Stamp>
         </div>
       </header>
 
-      {flags.season_banner && (
-        <button onClick={() => go({ name: 'leaderboard' })} className="mx-5 mb-3 block w-[calc(100%-2.5rem)] rounded-md border border-tape/50 bg-ink-2 px-4 py-2 text-left font-mono text-xs text-tape">
-          🏆 Season {season.id} ends in {seasonDays} {seasonDays === 1 ? 'day' : 'days'} ›
-        </button>
-      )}
-
-      <section className="mx-5 flex flex-wrap items-center gap-2 border-y border-line py-3">
-        {player.freeCasesToday > 0 ? (
-          <Pill tone="ok">● {player.freeCasesToday === 1 ? 'Free case today' : `${player.freeCasesToday} free cases today`}</Pill>
-        ) : (
-          <Pill>Free cases: used today</Pill>
-        )}
-        <Pill tone="tape">🗂️ {plural(player.caseCredits, 'extra case')}</Pill>
-        <Pill>⚖️ {plural(player.items.subpoena, 'Subpoena')}</Pill>
-        <Pill>🧭 {plural(player.items.trace, 'Trace')}</Pill>
-        <Pill>💡 {plural(player.items.hint, 'Hint')}</Pill>
-        {player.progress.streakDays > 0 && <Pill tone="tape">🔥 {player.progress.streakDays}</Pill>}
-        <button onClick={() => go({ name: 'profile' })} className="ml-auto font-display text-sm font-bold tracking-widest text-paper uppercase underline underline-offset-4">
-          Profile
-        </button>
-        <button onClick={() => go({ name: 'shop' })} className="ml-3 font-display text-sm font-bold tracking-widest text-tape uppercase underline underline-offset-4">
-          Shop ⭐
-        </button>
-        {isAdmin && (
-          <button onClick={() => go({ name: 'admin' })} className="ml-3 font-display text-sm font-bold tracking-widest text-rug uppercase underline underline-offset-4">
-            Review
-          </button>
-        )}
+      <section className="mx-5 border-y border-line py-5">
+        <Label>Chapter 1 · The Refund</Label>
+        <p className="mt-2 text-[15px] text-paper/85">The agency&apos;s first case is still being written up. Check back soon.</p>
       </section>
 
-      {flags.districts ? (
-        <DistrictMap />
-      ) : (
-        <section className="mt-6 space-y-5 px-5">
-          <Label>Open case files</Label>
-          {cases.map((c, i) => (
-            <CaseCard key={c.id} c={c} index={i} startHere={nextCase?.startHere && nextCase.id === c.id} />
-          ))}
-        </section>
-      )}
-
-      <section className="mt-8 px-5">
-        <Label>Got a case code?</Label>
-        <form
-          className="mt-2 flex gap-2"
-          onSubmit={(e) => {
-            e.preventDefault()
-            if (/^[A-Za-z0-9]{5}$/.test(code)) go({ name: 'room', code: code.toUpperCase() })
-            else toast('Case codes are 5 characters.', 'error')
-          }}
-        >
-          <input
-            value={code}
-            onChange={(e) => setCode(e.target.value.toUpperCase().slice(0, 5))}
-            placeholder="K7Q2M"
-            autoCapitalize="characters"
-            className="min-h-12 w-full rounded-md border border-line bg-ink-2 px-4 font-mono text-xl tracking-[0.4em] text-paper uppercase placeholder:text-line focus:border-tape focus:outline-none"
-          />
-          <Button variant="ghost" type="submit">
-            Join
-          </Button>
-        </form>
-      </section>
-
-      <section className="mt-10 px-5">
-        <Label>How a case works</Label>
-        <ol className="mt-3 space-y-3 text-[15px] text-paper/85">
-          {[
-            ['Brief', 'Everyone reads the same case file and timeline.'],
-            ['Split up', 'Each detective gets different clues, and suspects DM you with their side.'],
-            ['Accuse', 'Vote on who did it, why, and where the money went.'],
-          ].map(([t, d], i) => (
-            <li key={t} className="flex gap-3">
-              <span className="font-display text-3xl leading-none font-black text-rug">{i + 1}</span>
-              <span>
-                <b className="font-display text-lg tracking-wide uppercase">{t}.</b> {d}
-              </span>
-            </li>
-          ))}
-        </ol>
-        <p className="mt-6 text-xs text-dim">All projects, people and wallets are fictional parody. Cases teach how rugs are spotted, never how to run one.</p>
-      </section>
+      <p className="mt-8 px-5 text-xs text-dim">All projects, people and accounts are fictional. Cases show how scams are caught, never how to run one.</p>
     </div>
   )
 }

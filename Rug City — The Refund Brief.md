@@ -16,7 +16,7 @@ The player should feel that their reasoning changes the investigation. Test an 8
 
 Read `AGENTS.md`, `docs/CONVENTIONS.md`, `docs/ops/environments.md`, and the relevant installed Next.js guides before writing code. Preserve the conventions on pure rules, store parity, server authority, validation and additive migrations. The old Phase 1 plan is archived; its features are not requirements for this task.
 
-Use a new branch such as `refund/the-refund`. Implement and verify locally first. Follow repository rules for committing (`docs/CONVENTIONS.md`): one PR into `main`, merged only when Endrit asks. Migrations are additive and are applied to the shared database, the preview repointed and the `refund_prototype` flag switched on only when Endrit asks to test, following `docs/ops/environments.md`. The legacy crew game keeps working beside the new case until a separate task removes it.
+Use a new branch such as `refund/the-refund`. Implement and verify locally first. Follow repository rules for committing (`docs/CONVENTIONS.md`): one PR into `main`, merged only when Endrit asks. Migrations are additive and are applied to the shared database, the preview repointed and the `refund_prototype` flag switched on only when Endrit asks to test, following `docs/ops/environments.md`. The earlier crew game was removed from the code on 2026-10-11; only the foundation (Telegram auth, store, flags, analytics, noir UI primitives) remains.
 
 ## In scope
 
@@ -29,7 +29,7 @@ Use a new branch such as `refund/the-refund`. Implement and verify locally first
 
 ## Out of scope
 
-Crew play; replacing the legacy case engine; new districts; paid help; purchases; credits; ratings; reward settlement; streaks; cash prizes; free-text AI chat; case generation; a general visual case editor; a second playable chapter; live notifications to users. The final chapter teaser is clearly marked as unavailable.
+Crew play; restoring any part of the removed crew game; new districts; paid help; purchases; credits; ratings; reward settlement; streaks; cash prizes; free-text AI chat; case generation; a general visual case editor; a second playable chapter; live notifications to users. The final chapter teaser is clearly marked as unavailable.
 
 Do not implement a generic workflow engine. Use a small typed case model and explicit rules sufficient for this case, with room to add another authored case later.
 
@@ -230,9 +230,9 @@ Convert evidence IDs to player-facing titles in actual dialogue. Hint prerequisi
 
 # 9. Implementation approach
 
-Inspect current code rather than copying stale APIs from this brief. Relevant existing paths include `lib/game/engine.ts`, `lib/game/view.ts`, `lib/rooms.ts`, `lib/store/*`, `lib/server.ts`, `lib/flags.ts`, `components/Game.tsx`, `components/phases/*`, `components/evidence/*`, `hooks/useRoom.ts`, and `lib/analytics.ts`.
+Inspect current code rather than copying stale APIs from this brief. Relevant existing paths include `lib/server.ts`, `lib/errors.ts`, `lib/store/*`, `lib/flags.ts`, `lib/analytics.ts`, `lib/telegram/*`, `lib/client/api.ts`, `components/Game.tsx`, `components/Home.tsx` and `components/ui.tsx`. The removed crew game's evidence and suspect screens (`components/evidence/*`, `components/phases/*`) and its pure-rules/projection pattern (`lib/game/engine.ts`, `lib/game/view.ts`) can be read in git history at commit `930b94d` for visual and structural reference; do not restore them.
 
-Keep this prototype distinct from `CaseFile` and the current majority-vote engine. Suggested small modules: `lib/investigation/types.ts`, `rules.ts`, `view.ts`, `refund.ts` (server-only content), a service and a few investigation components. Actual layout should fit the repository. Do not import hidden content into client bundles or coerce this case into legacy votes/rewards.
+Suggested small modules: `lib/investigation/types.ts`, `rules.ts`, `view.ts`, `refund.ts` (server-only content), a service and a few investigation components. Actual layout should fit the repository. Do not import hidden content into client bundles.
 
 ## Persisted run
 
@@ -260,7 +260,7 @@ Use run/case/version/action IDs, success and hint level; never store raw chat te
 
 ## Functional paths
 
-1. With the flag off, the legacy experience is unchanged and prototype starts are refused.
+1. With the flag off, Home shows its placeholder and prototype starts are refused by the server.
 2. Flag on: a new user reaches the first evidence comparison without shop, district-selection or credit requirements.
 3. Complete one full path using only scripted topics and records, without AI credentials.
 4. Branch test: after C01, establish F03/F04 before challenging Lena about approval; the case still resolves.
@@ -275,7 +275,6 @@ Use run/case/version/action IDs, success and hint level; never store raw chat te
 - Non-owner and unauthenticated run access is rejected.
 - Guessed undiscovered evidence/finding/confrontation IDs cannot unlock progress.
 - Intro and intermediate projections contain no hidden approval, ownership, creditor records or final solution table.
-- No prototype action invokes legacy case charging, reward settlement, referral bonuses, rated result insertion or season counters.
 - Request payload limits, validation and existing error handling apply.
 
 ## Content checks

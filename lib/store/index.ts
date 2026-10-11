@@ -4,20 +4,20 @@ import { createMemoryStore } from './memory'
 import { createSupabaseStore } from './supabase'
 import type { Store } from './types'
 
-const g = globalThis as unknown as { __whoRuggedStore?: Store }
+const g = globalThis as unknown as { __rugCityStore?: Store }
 
 export function store(): Store {
-  if (!g.__whoRuggedStore) {
+  if (!g.__rugCityStore) {
     const { supabaseUrl, supabaseServiceKey } = env()
-    g.__whoRuggedStore =
+    g.__rugCityStore =
       supabaseUrl && supabaseServiceKey ? createSupabaseStore(supabaseUrl, supabaseServiceKey) : createMemoryStore()
   }
-  return g.__whoRuggedStore
+  return g.__rugCityStore
 }
 
 /** Tests only: drop the store so the next `store()` call builds a fresh one. */
 export function resetStore() {
-  delete g.__whoRuggedStore
+  delete g.__rugCityStore
 }
 
-export type { Store, Purchase, AppEvent } from './types'
+export type { Store, AppEvent } from './types'

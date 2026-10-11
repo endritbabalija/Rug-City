@@ -6,12 +6,6 @@
 
 type HapticImpact = 'light' | 'medium' | 'heavy' | 'rigid' | 'soft'
 type HapticNotice = 'error' | 'success' | 'warning'
-type InvoiceStatus = 'paid' | 'cancelled' | 'failed' | 'pending'
-
-interface StoryWidgetLink {
-  url: string
-  name?: string
-}
 
 interface BackButton {
   show(): void
@@ -38,9 +32,7 @@ export interface TelegramWebApp {
   setHeaderColor(color: string): void
   setBackgroundColor(color: string): void
   setBottomBarColor?(color: string): void
-  openInvoice(url: string, cb?: (status: InvoiceStatus) => void): void
   openTelegramLink(url: string): void
-  shareToStory?(mediaUrl: string, params?: { text?: string; widget_link?: StoryWidgetLink }): void
   onEvent(event: string, cb: (...args: unknown[]) => void): void
   offEvent(event: string, cb: (...args: unknown[]) => void): void
   BackButton: BackButton
@@ -83,7 +75,7 @@ export function initTelegram() {
     wa.setBackgroundColor(INK)
   }
   if (atLeast('7.10')) wa.setBottomBarColor?.(INK)
-  // Scrolling clue lists shouldn't swipe the app closed.
+  // Scrolling evidence lists shouldn't swipe the app closed.
   if (atLeast('7.7')) wa.disableVerticalSwipes?.()
 }
 
@@ -140,14 +132,6 @@ export function setClosingConfirmation(on: boolean) {
   else wa.disableClosingConfirmation()
 }
 
-// ── Payments (Telegram Stars) ─────────────────────────────────────────────
-
-export function openInvoice(link: string): Promise<InvoiceStatus> {
-  const wa = webApp()
-  if (!wa || !atLeast('6.1')) return Promise.resolve('failed')
-  return new Promise((resolve) => wa.openInvoice(link, resolve))
-}
-
 // ── Sharing ───────────────────────────────────────────────────────────────
 
 export function shareToChat(url: string, text: string) {
@@ -155,10 +139,4 @@ export function shareToChat(url: string, text: string) {
   const wa = webApp()
   if (wa) wa.openTelegramLink(share)
   else window.open(share, '_blank', 'noopener')
-}
-
-export const canShareStory = () => atLeast('7.8') && !!webApp()?.shareToStory
-
-export function shareStory(mediaUrl: string, text: string, link?: StoryWidgetLink) {
-  webApp()?.shareToStory?.(mediaUrl, { text: text.slice(0, 200), widget_link: link })
 }

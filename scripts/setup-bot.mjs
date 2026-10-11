@@ -30,14 +30,12 @@ const base = appUrl.replace(/\/$/, '')
 await call('setWebhook', {
   url: `${base}/api/telegram/webhook`,
   secret_token: secret,
-  allowed_updates: ['message', 'pre_checkout_query'],
+  allowed_updates: ['message'],
   drop_pending_updates: true,
 })
 await call('setMyCommands', {
   commands: [
-    { command: 'play', description: 'Start a case with this group' },
-    { command: 'start', description: 'Open Who Rugged?' },
-    { command: 'paysupport', description: 'Help with a Stars payment' },
+    { command: 'start', description: 'Open Rug City' },
   ],
 })
 await call('setChatMenuButton', { menu_button: { type: 'web_app', text: 'Play', web_app: { url: base } } })

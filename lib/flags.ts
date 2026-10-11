@@ -2,8 +2,8 @@ import 'server-only'
 import { env } from './env'
 import { store } from './store'
 
-/** Every feature flag. Each ships off; see docs/archive/phase-1/DEFAULTS.md. */
-export type FlagName = 'season_banner' | 'solo' | 'dex_crew' | 'districts' | 'tutorial' | 'daily'
+/** Every feature flag. Each ships off. */
+export type FlagName = 'refund_prototype'
 
 const CACHE_MS = 30_000
 
