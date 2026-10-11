@@ -1,5 +1,5 @@
 import 'server-only'
-import { canPlay, DISTRICTS, districtState, type DistrictState } from '../districts'
+import { canPlay, DISTRICTS, districtState, pickNextCase, unlockProgress, type DistrictState } from '../districts'
 import type { Player } from '../player'
 import { store } from '../store'
 import type { CaseMeta } from '../store/types'
@@ -119,14 +119,18 @@ export interface DistrictSummary {
   unlockRank: string
   order: number
   state: DistrictState
+  /** The player's Clue Points towards `unlockRank`. */
+  unlock: { have: number; need: number }
 }
 
 /**
  * What a player sees on Home: the districts that have cases, the cases they can open with
- * their played state, and the date (only) of the next case due in an open district.
+ * their played state, the Next case card, and the date (only) of the next case due in an open
+ * district. `tutorialId` is set for a player who gets the tutorial (`isTutorial`).
  */
-export async function caseBoard(player: Pick<Player, 'cluePoints'>, played: string[], now = Date.now()) {
+export async function caseBoard(player: Pick<Player, 'cluePoints'>, played: string[], now = Date.now(), tutorialId?: string) {
   const cases = await listCases(now)
+  const rows = await caseIndex()
   const districts: DistrictSummary[] = DISTRICTS.filter((d) => cases.some((c) => c.district === d.id)).map((d) => ({
     id: d.id,
     name: d.name,
@@ -136,12 +140,18 @@ export async function caseBoard(player: Pick<Player, 'cluePoints'>, played: stri
     unlockRank: d.unlockRank,
     order: d.order,
     state: districtState(player, d, cases),
+    unlock: unlockProgress(player, d),
   }))
   const open = districts.filter((d) => d.state === 'open').map((d) => d.id)
   const next = await nextRelease(open, now)
+  const board = cases.filter((c) => canPlay(player, c)).map((c) => summary(c, played.includes(c.id)))
+  // Newest first by release time; built-ins (no row) and rows without one count as oldest, in list order.
+  const releasedAt = (id: string) => rows.get(id)?.releaseAt ?? 0
+  const newest = board.map((c, i) => ({ c, i })).sort((a, b) => releasedAt(b.c.id) - releasedAt(a.c.id) || b.i - a.i)
   return {
     districts,
-    cases: cases.filter((c) => canPlay(player, c)).map((c) => summary(c, played.includes(c.id))),
+    cases: board,
+    nextCase: pickNextCase(newest.map((x) => x.c), open, tutorialId),
     /** UTC date, `YYYY-MM-DD`. */
     nextDrop: next === null ? null : new Date(next).toISOString().slice(0, 10),
   }

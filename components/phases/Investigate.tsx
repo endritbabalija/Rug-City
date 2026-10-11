@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { haptic } from '@/lib/telegram/webapp'
 import { ClueCard } from '../evidence/ClueCard'
 import { DexPanel } from '../evidence/DexPanel'
+import { DexTip } from '../evidence/DexTip'
 import { Explorer } from '../evidence/Explorer'
 import { helpCost } from '../evidence/helpCost'
 import { Interrogation } from '../evidence/Interrogation'
@@ -14,7 +15,7 @@ import { Button, Confirm, Countdown, Label, timeLeft, useClock } from '../ui'
 type Tab = 'clues' | 'dex' | 'explorer' | 'suspects' | 'board'
 
 export function Investigate(props: PhaseProps) {
-  const { room, run, busy, now } = props
+  const { room, run, busy, now, tips } = props
   const { player, buy } = useGame()
   const [tab, setTab] = useState<Tab>('clues')
   const [confirm, setConfirm] = useState<'hint' | 'vote' | null>(null)
@@ -74,6 +75,7 @@ export function Investigate(props: PhaseProps) {
       <div className="pt-5 pb-28">
         {tab === 'clues' && (
           <div className="space-y-6 px-4">
+            <DexTip step="clue" room={room} tips={tips} />
             <p className="text-sm text-dim">
               {room.mode === 'solo' ? 'Your half of the evidence. Dex has the rest.' : 'Only you can see these. Read them out, screenshot them, argue about them in the group chat.'}
             </p>
@@ -83,7 +85,12 @@ export function Investigate(props: PhaseProps) {
           </div>
         )}
         {tab === 'dex' && room.dex && <DexPanel {...props} />}
-        {tab === 'explorer' && <Explorer {...props} />}
+        {tab === 'explorer' && (
+          <>
+            <DexTip step="explorer" room={room} tips={tips} className="mx-4 mb-5" />
+            <Explorer {...props} />
+          </>
+        )}
         {tab === 'suspects' && <Interrogation {...props} />}
         {tab === 'board' && (
           <div className="px-4">

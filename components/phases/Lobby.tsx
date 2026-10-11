@@ -117,10 +117,12 @@ export function Lobby({ room, run, busy }: PhaseProps) {
             </Button>
             <p className="mt-2 text-center text-xs text-dim">
               {player.freeCaseAvailable
-                ? 'Uses your free case for today.'
+                ? player.freeCasesToday > 1
+                  ? `Uses 1 of your ${player.freeCasesToday} free cases today.`
+                  : 'Uses your free case for today.'
                 : player.caseCredits > 0
                   ? `Uses 1 of your ${player.caseCredits} cases.`
-                  : "You've used today's free case. A pack gives you 5 more."}
+                  : "You've used today's free cases. A pack gives you 5 more."}
             </p>
           </>
         ) : (

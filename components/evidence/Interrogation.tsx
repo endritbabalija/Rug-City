@@ -4,11 +4,12 @@ import { useEffect, useRef, useState } from 'react'
 import { ApiError } from '@/lib/client/api'
 import { useGame } from '../GameContext'
 import type { PhaseProps } from '../Room'
+import { DexTip } from './DexTip'
 import { Button, Confirm, Label } from '../ui'
 import { helpCost } from './helpCost'
 import { SuspectCard } from './SuspectCard'
 
-export function Interrogation({ room, run, busy, ask }: PhaseProps) {
+export function Interrogation({ room, run, busy, ask, tips }: PhaseProps) {
   const { player, buy, toast } = useGame()
   const [active, setActive] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
@@ -48,6 +49,7 @@ export function Interrogation({ room, run, busy, ask }: PhaseProps) {
   if (!active || !thread || !suspect) {
     return (
       <div className="px-4">
+        <DexTip step="chat" room={room} tips={tips} className="mb-5" />
         <p className="text-sm text-dim">
           {room.mode === 'solo'
             ? 'These suspects reached out to you privately. Only you and Dex are on this one.'

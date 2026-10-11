@@ -15,9 +15,9 @@ import { GameError } from './game/engine'
 import * as dex from './game/dex'
 import { applyAward, awardCase, REFERRAL_POINTS, seasonRating } from './game/progress'
 import { targetFor } from './game/scoring'
-import { type Award, type ChatMessage, type RoomState, type Vote } from './game/types'
+import { type Award, type ChatMessage, type RoomState, type TutorialStep, type Vote } from './game/types'
 import { buildView } from './game/view'
-import { applyGrant, consumeCase, hasFreeCase, spendItem, type Player } from './player'
+import { applyGrant, caseSource, consumeCase, refundCase, spendItem, type CaseSource, type Player } from './player'
 import { currentSeason } from './seasons'
 import { store } from './store'
 
@@ -79,15 +79,16 @@ export async function createRoom(player: Player, caseId: string) {
   return (await insertRoom((code) => engine.createRoom(code, c, { id: player.id, name: player.name, badge: badgeOf(player) }, Date.now()))).code
 }
 
-/** Today's free case or a case credit, and the matching refund. */
-function caseCharge() {
-  let usedFree = false
+/** A free case (day-one cases with flag `tutorial`) or a case credit, and the matching refund. */
+async function caseCharge() {
+  const dayOne = await flag('tutorial')
+  let source: CaseSource = 'credit'
   return [
     (p: Player) => {
-      usedFree = hasFreeCase(p, Date.now())
-      return consumeCase(p, Date.now())
+      source = caseSource(p, Date.now(), dayOne) ?? 'credit'
+      return consumeCase(p, Date.now(), dayOne)
     },
-    (p: Player) => (usedFree ? { ...p, freeCaseDay: undefined } : { ...p, caseCredits: p.caseCredits + 1 }),
+    (p: Player) => refundCase(p, source),
   ] as const
 }
 
@@ -100,19 +101,26 @@ export async function createPlaytest(player: Player, caseId: string) {
   return room.code
 }
 
+/** A player with no finished case gets the tutorial: flag `tutorial`, `TUTORIAL_CASE_ID`, solo. */
+export async function isTutorial(player: Pick<Player, 'id'>, caseId: string) {
+  if (caseId !== dex.TUTORIAL_CASE_ID || !(await flag('tutorial'))) return false
+  return (await store().recentResults(player.id, 1)).length === 0
+}
+
 /** A solo case with Dex: charged like hosting, refunded if the room can't be created. */
 export async function createSolo(player: Player, caseId: string) {
   const c = await requireHostable(player, caseId)
-  const [charge, refund] = caseCharge()
+  const tutorial = await isTutorial(player, c.id)
+  const [charge, refund] = await caseCharge()
   await store().updatePlayer(player.id, charge)
   let room: RoomState
   try {
-    room = await insertRoom((code) => engine.createSoloRoom(code, c, { id: player.id, name: player.name, badge: badgeOf(player) }, Date.now()))
+    room = await insertRoom((code) => engine.createSoloRoom(code, c, { id: player.id, name: player.name, badge: badgeOf(player) }, Date.now(), { tutorial }))
   } catch (err) {
     await store().updatePlayer(player.id, refund)
     throw err
   }
-  track('case_start', player.id, { caseId: c.id, mode: 'solo', seats: 1, code: room.code })
+  track('case_start', player.id, { caseId: c.id, mode: 'solo', seats: 1, code: room.code, tutorial })
   return room.code
 }
 
@@ -186,6 +194,7 @@ export type RoomAction =
   | { type: 'addDex' }
   | { type: 'removeDex' }
   | { type: 'invited' }
+  | { type: 'tutorialStep'; step: TutorialStep }
 
 export async function act(code: string, player: Player, action: RoomAction) {
   const me = { id: player.id, name: player.name, badge: badgeOf(player) }
@@ -196,7 +205,7 @@ export async function act(code: string, player: Player, action: RoomAction) {
       return mutate(code, (s, _c, now) => engine.leave(s, player.id, now))
     case 'start': {
       const minPlayers = minPlayersFor(player.id)
-      const started = await chargedStep(code, player, ...caseCharge(), (s, _c, now) => engine.start(s, player.id, now, minPlayers))
+      const started = await chargedStep(code, player, ...(await caseCharge()), (s, _c, now) => engine.start(s, player.id, now, minPlayers))
       track('case_start', player.id, { caseId: started.caseId, mode: engine.roomMode(started), seats: engine.humanSeats(started).length, code })
       return started
     }
@@ -231,6 +240,16 @@ export async function act(code: string, player: Player, action: RoomAction) {
       // Only recorded: the host tapped invite or copy link. The room doesn't change.
       const { room } = await loadRoom(code)
       track('invite_sent', player.id, { code })
+      return room
+    }
+    case 'tutorialStep': {
+      let reached = false
+      const room = await mutate(code, (s, _c, now) => {
+        const next = dex.reachTutorialStep(s, player.id, action.step, now)
+        reached = next !== s
+        return next
+      })
+      if (reached) track('tutorial_step', player.id, { step: action.step, code })
       return room
     }
   }
@@ -345,6 +364,7 @@ export async function settleAfter(state: RoomState) {
   if (!claimed) return settled
   // A playtest pays nobody and doesn't count as a play of the case.
   if (settled.playtest) return store().updateRoom(state.code, (s) => ({ ...s, awards: {} }))
+  if (settled.tutorial) track('tutorial_done', settled.hostId, { caseId: settled.caseId, code: settled.code, correct: Object.values(settled.result!.correct).filter(Boolean).length })
 
   const caseFile = await requireCase(settled.caseId)
   const now = Date.now()

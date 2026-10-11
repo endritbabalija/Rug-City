@@ -144,10 +144,18 @@ export function createSoloRoom(
   c: CaseFile,
   player: { id: number; name: string; badge?: string },
   now: number,
-  opts: { playtest?: boolean } = {},
+  opts: { playtest?: boolean; tutorial?: boolean } = {},
 ): RoomState {
   const room = createRoom(code, c, player, now)
-  const solo: RoomState = { ...room, mode: 'solo', seats: [player.id, DEX_ID], dexShared: [], dexMessages: [], ...(opts.playtest && { playtest: true }) }
+  const solo: RoomState = {
+    ...room,
+    mode: 'solo',
+    seats: [player.id, DEX_ID],
+    dexShared: [],
+    dexMessages: [],
+    ...(opts.playtest && { playtest: true }),
+    ...(opts.tutorial && !opts.playtest && { tutorial: true, tutorialSteps: [] }),
+  }
   return log(setPhase(solo, 'briefing', now), player.id, opts.playtest ? 'Playtest: nothing is charged or recorded.' : 'The case file is open.', now)
 }
 

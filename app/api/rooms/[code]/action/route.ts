@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { TUTORIAL_STEPS } from '@/lib/game/types'
 import { act, normalizeCode, viewRoom } from '@/lib/rooms'
 import { authenticate, publicPlayer, route } from '@/lib/server'
 import { store } from '@/lib/store'
@@ -13,6 +14,7 @@ const Action = z.discriminatedUnion('type', [
   z.object({ type: z.literal('trace'), walletId: Id }),
   z.object({ type: z.literal('subpoena'), suspectId: Id }),
   z.object({ type: z.literal('askDex'), ask: z.enum(['clue', 'hint']) }),
+  z.object({ type: z.literal('tutorialStep'), step: z.enum(TUTORIAL_STEPS) }),
 ])
 
 export const POST = route<Ctx>(async (req, { params }) => {

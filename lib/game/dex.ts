@@ -4,7 +4,8 @@
 
 import type { CaseFile } from '../cases/types'
 import { addHelp, cluesFor, GameError, log, nameOf, requireMember, requirePhase, roomHelp, roomMode, seatsTaken } from './engine'
-import { DEX_ID, MAX_PLAYERS, type DexMessage, type RoomState } from './types'
+import { CASE_POINTS } from './scoring'
+import { DEX_ID, MAX_PLAYERS, QUESTIONS_PER_PLAYER, type DexMessage, type Phase, type RoomState, type TutorialStep } from './types'
 
 /** Hints Dex gives per case, free of items. Each still carries the Dex hint penalty; shop Hints work after that. */
 export const DEX_FREE_HINTS = 2
@@ -14,6 +15,23 @@ const MAX_DEX_MESSAGES = 40
 export const DEX_RELEASE_SCHEDULE = { firstMs: 30_000, everyMs: 2 * 60_000 }
 
 export type DexAsk = DexMessage['ask']
+
+/** A new player's first case, played solo with Dex's tips on. No separate tutorial case (DEFAULTS.md → Tutorial). */
+export const TUTORIAL_CASE_ID = 'mooncat-exit'
+
+/** Dex's one scripted tip at each tutorial step. Static, no AI call. */
+export const TUTORIAL_TIPS: Record<TutorialStep, string> = {
+  briefing:
+    "First case? Good, I like fresh eyes. Read the file top to bottom: the pitch, the timeline, the suspects. Note anything that sounds too convenient. When you're done, tap Start investigating and we split the evidence.",
+  clue: "These are your clues. I'm holding the rest: ask me in the Dex tab and I'll hand them over one at a time. Watch for names, times and wallets that turn up in more than one place.",
+  explorer:
+    "This is the chain. Wallets up top, transactions below. Follow the money out of the project's wallet and see where it lands. A wallet with a hidden source needs a Trace, and that costs some score.",
+  chat: `Suspects message you privately. You get ${QUESTIONS_PER_PLAYER} questions, so ask about something a clue contradicts. They lie to cover themselves: check every answer against the evidence.`,
+  vote: `Three calls: who did it, why, and where the money went. Each scores on its own: ${CASE_POINTS.culprit} for the culprit, ${CASE_POINTS.motive} each for motive and trail, plus up to ${CASE_POINTS.time} for speed. Lock it in when you're sure.`,
+}
+
+/** The phase each tutorial step happens in. */
+const TUTORIAL_PHASE: Record<TutorialStep, Phase> = { briefing: 'briefing', clue: 'investigate', explorer: 'investigate', chat: 'investigate', vote: 'accuse' }
 
 export const hasDex = (state: RoomState) => state.seats.includes(DEX_ID)
 
@@ -68,6 +86,18 @@ export function dexNextReleaseAt(state: RoomState, c: CaseFile, now: number): nu
   if (roomMode(state) !== 'crew' || !hasDex(state) || started === undefined) return null
   const next = dexReleased(state, c, now).length
   return next < dexHand(state, c).length ? dexReleaseAt(started, next) : null
+}
+
+// ── Tutorial ───────────────────────────────────────────────────────────────
+
+/** The player reached a tutorial step, so Dex's tip for it is given. Reaching it again returns the same state. */
+export function reachTutorialStep(state: RoomState, actorId: number, step: TutorialStep, now: number): RoomState {
+  requireMember(state, actorId)
+  if (!state.tutorial) throw new GameError('NOT_TUTORIAL', 'This case has no tutorial.', 409)
+  requirePhase(state, TUTORIAL_PHASE[step])
+  const steps = state.tutorialSteps ?? []
+  if (steps.some((s) => s.step === step)) return state
+  return { ...state, tutorialSteps: [...steps, { step, at: now }] }
 }
 
 // ── Asking Dex ─────────────────────────────────────────────────────────────

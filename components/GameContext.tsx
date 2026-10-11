@@ -26,6 +26,8 @@ export interface GameCtx {
   districts: DistrictSummary[]
   /** UTC date (`YYYY-MM-DD`) of the next case due in an open district. */
   nextDrop: string | null
+  /** Home's Next case card; `startHere` marks the tutorial for a player with no finished case. */
+  nextCase: { id: string; startHere: boolean } | null
   skus: Sku[]
   badges: Record<string, { name: string; icon: string }>
   /** Feature flags the client needs (lib/flags.ts). */

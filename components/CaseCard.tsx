@@ -8,7 +8,7 @@ import { useGame } from './GameContext'
 import { Button, Confirm, Stamp } from './ui'
 
 /** A case file on the board, with buttons to host it or play it solo. */
-export function CaseCard({ c, index }: { c: CaseSummary; index: number }) {
+export function CaseCard({ c, index, startHere = false }: { c: CaseSummary; index: number; startHere?: boolean }) {
   const { flags, go, toast, buy } = useGame()
   const [busy, setBusy] = useState<'crew' | 'solo' | null>(null)
   const [confirmReplay, setConfirmReplay] = useState(false)
@@ -47,6 +47,9 @@ export function CaseCard({ c, index }: { c: CaseSummary; index: number }) {
           <Stamp className="text-xs">New</Stamp>
         )}
       </div>
+      {startHere && (
+        <p className="mt-2 inline-block bg-tape px-2 py-0.5 font-display text-sm font-black tracking-widest text-ink uppercase">★ Start here</p>
+      )}
       <h2 className="mt-2 font-display text-[2.1rem] leading-none font-black uppercase">{c.title}</h2>
       <p className="mt-1 font-type text-sm font-bold text-rug uppercase">{c.crime}</p>
       <p className="mt-3 font-type text-[15px] leading-snug">{c.tagline}</p>
@@ -71,6 +74,7 @@ export function CaseCard({ c, index }: { c: CaseSummary; index: number }) {
           </Button>
         ))}
       <p className="mt-2 font-type text-xs text-paper-ink/70">
+        {startHere && flags.solo ? 'Your first case: play it solo and Dex walks you through each step. ' : ''}
         {c.played ? "You've closed this one; your friends can still earn on it. " : ''}
         Host: invite {MIN_PLAYERS - 1}+ friends.{flags.solo ? ' Solo: you and Dex.' : ''}
       </p>
