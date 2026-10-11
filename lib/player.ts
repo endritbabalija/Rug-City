@@ -16,6 +16,34 @@ export interface Player {
   referredBy?: number
   referralSettled?: boolean
   createdAt: number
+
+  // Progress (lib/game/progress.ts). All optional so older player docs keep working.
+  /** Lifetime Clue Points. Never reset, never bought. */
+  cluePoints?: number
+  streakDays?: number
+  /** UTC date of the last rated case, for streaks. */
+  lastRatedDay?: string
+  /** Rated cases on `ratedDay`, for the daily limit. */
+  ratedDay?: string
+  ratedCount?: number
+  /** Every case this player has finished. Only the first finish of a case is rated. */
+  playedCases?: string[]
+  /** Best case scores this season (at most RATING_BEST_OF), highest first. */
+  season?: { id: number; scores: number[] }
+  recent?: RecentCase[]
+  /** Seasons whose end-of-season rewards were already granted to this player. */
+  seasonRewards?: number[]
+}
+
+export interface RecentCase {
+  caseId: string
+  title: string
+  at: number
+  points: number
+  /** How many of culprit / motive / trail this player got right. */
+  correct: number
+  rating?: number
+  unrated?: string
 }
 
 export function newPlayer(profile: { id: number; name: string; username?: string; photoUrl?: string }, now: number, referredBy?: number): Player {

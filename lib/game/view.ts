@@ -1,6 +1,6 @@
 import type { CaseFile, Clue, Option, Tx, Wallet } from '../cases/types'
-import { chatKey, cluesFor, questionsLeft, suspectsFor } from './engine'
-import { ACCUSE_GRACE_MS, INVESTIGATE_MS, type ChatMessage, type FeedItem, type Phase, type RoomResult, type Vote } from './types'
+import { chatKey, cluesFor, countCorrect, questionsLeft, suspectsFor } from './engine'
+import { ACCUSE_GRACE_MS, INVESTIGATE_MS, type Award, type ChatMessage, type FeedItem, type Phase, type RoomResult, type Vote } from './types'
 import type { RoomState } from './types'
 
 export interface PublicSuspect {
@@ -50,7 +50,18 @@ export interface RoomView {
   feed: FeedItem[]
   myVote: Vote | null
   votesIn: number
-  result: (RoomResult & { answer: Vote; reveal: string[] }) | null
+  result:
+    | (RoomResult & {
+        answer: Vote
+        reveal: string[]
+        /** Everyone's own vote, shown once the case is over. */
+        crew: { id: number; name: string; badge?: string; vote: Vote | null; correct: number }[]
+        /** What this player earned; null until the room has settled. */
+        myAward: Award | null
+        settled: boolean
+        assisted: boolean
+      })
+    | null
 }
 
 export function buildView(state: RoomState, c: CaseFile, playerId: number, now: number): RoomView {
@@ -105,6 +116,23 @@ export function buildView(state: RoomState, c: CaseFile, playerId: number, now: 
     feed: state.feed,
     myVote: state.votes[String(playerId)] ?? null,
     votesIn: Object.keys(state.votes).length,
-    result: revealed && state.result ? { ...state.result, answer: c.answer, reveal: c.reveal } : null,
+    result:
+      revealed && state.result
+        ? {
+            ...state.result,
+            answer: c.answer,
+            reveal: c.reveal,
+            crew: state.players
+              .filter((p) => state.seats.includes(p.id))
+              .map((p) => {
+                const vote = state.votes[String(p.id)] ?? null
+                return { id: p.id, name: p.name, badge: p.badge, vote, correct: vote ? countCorrect(c, vote) : 0 }
+              }),
+            myAward: state.awards?.[String(playerId)] ?? null,
+            /** Points are settled; a missing award then means none was recorded (e.g. a pre-points room). */
+            settled: !!state.awards,
+            assisted: !!state.assisted,
+          }
+        : null,
   }
 }

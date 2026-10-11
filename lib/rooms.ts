@@ -4,11 +4,12 @@ import { suspectReply } from './ai/suspect'
 import { getCase } from './cases'
 import type { CaseFile } from './cases/types'
 import type { ItemKey } from './catalog'
-import { BADGES } from './catalog'
+import { badgeInfo } from './catalog'
 import { env } from './env'
 import * as engine from './game/engine'
 import { GameError } from './game/engine'
-import type { RoomState, Vote } from './game/types'
+import { awardCase, REFERRAL_POINTS, seasonRating } from './game/progress'
+import type { Award, RoomState, Vote } from './game/types'
 import { buildView } from './game/view'
 import { applyGrant, consumeCase, hasFreeCase, spendItem, type Player } from './player'
 import { store } from './store'
@@ -43,7 +44,7 @@ function minPlayersFor(hostId: number) {
   return cfg.adminIds.includes(hostId) ? 1 : cfg.minPlayers
 }
 
-const badgeOf = (p: Player) => (p.activeBadge ? BADGES[p.activeBadge]?.icon : undefined)
+const badgeOf = (p: Player) => (p.activeBadge ? badgeInfo(p.activeBadge)?.icon : undefined)
 
 export async function createRoom(player: Player, caseId: string) {
   const c = requireCase(caseId)
@@ -167,11 +168,16 @@ export async function ask(code: string, player: Player, suspectId: string, text:
 }
 
 /**
- * Referral bonus: once a referred player finishes their first case,
- * they and the host who brought them each get a free case.
+ * Runs once per finished room: Clue Points and season ratings for every seat, plus the
+ * referral bonus (once a referred player finishes their first rated case, they and the
+ * host who brought them each get a free case, and the host gets Clue Points).
+ *
+ * The room is claimed first so no second request can settle it again. After that every
+ * seat settles independently: one failing write never blocks the other players, and the
+ * awards that did succeed are always written back so the verdict screen can show them.
  */
 async function settleAfter(state: RoomState) {
-  if (state.phase !== 'reveal' || state.rewardsSettled) return state
+  if (state.phase !== 'reveal' || state.rewardsSettled || !state.result) return state
   let claimed = false
   const settled = await store().updateRoom(state.code, (s) => {
     claimed = !s.rewardsSettled
@@ -179,17 +185,53 @@ async function settleAfter(state: RoomState) {
   })
   if (!claimed) return settled
 
-  for (const id of state.seats) {
-    let referrer: number | undefined
-    await store().updatePlayer(id, (p) => {
-      referrer = undefined
-      if (!p.referredBy || p.referralSettled) return p
-      referrer = p.referredBy
-      return { ...p, referralSettled: true, caseCredits: p.caseCredits + 1 }
-    })
-    if (referrer && (await store().getPlayer(referrer))) {
-      await store().updatePlayer(referrer, (p) => ({ ...p, caseCredits: p.caseCredits + 1 }))
+  const caseFile = requireCase(settled.caseId)
+  const now = Date.now()
+  const awards: Record<string, Award> = {}
+  await Promise.all(
+    settled.seats.map(async (id) => {
+      try {
+        const award = await settleSeat(settled, caseFile, id, now)
+        awards[String(id)] = award
+      } catch (err) {
+        console.error('Settling seat failed', settled.code, id, err)
+      }
+    }),
+  )
+  return store().updateRoom(state.code, (s) => ({ ...s, awards }))
+}
+
+async function settleSeat(room: RoomState, caseFile: CaseFile, id: number, now: number) {
+  let referrer: number | undefined
+  let award: Award | undefined
+  let ratingChanged = false
+  const player = await store().updatePlayer(id, (p) => {
+    const r = awardCase(p, { caseFile, seats: room.seats.length, vote: room.votes[String(id)], result: room.result!, assisted: !!room.assisted, now })
+    award = r.award
+    ratingChanged = r.ratingChanged
+    referrer = undefined
+    // The referral pays out on the friend's first case that counts, not just any finish.
+    if (!p.referredBy || p.referralSettled || r.award.unrated) return r.player
+    referrer = p.referredBy
+    return { ...r.player, referralSettled: true, caseCredits: r.player.caseCredits + 1 }
+  })
+
+  // Bookkeeping after the player's points are safe: a failure here costs a leaderboard
+  // refresh or a referral bonus, never the points themselves.
+  if (ratingChanged) {
+    const { rating, cases } = seasonRating(player, now)
+    await store()
+      .raiseSeasonRating({ season: player.season!.id, playerId: id, name: player.name, badge: badgeOf(player), rating, cases, updatedAt: now })
+      .catch((err) => console.error('Leaderboard write failed', id, err))
+  }
+  if (referrer) {
+    try {
+      if (await store().getPlayer(referrer)) {
+        await store().updatePlayer(referrer, (p) => ({ ...p, caseCredits: p.caseCredits + 1, cluePoints: (p.cluePoints ?? 0) + REFERRAL_POINTS }))
+      }
+    } catch (err) {
+      console.error('Referral bonus failed', referrer, err)
     }
   }
-  return settled
+  return award!
 }

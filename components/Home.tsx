@@ -29,7 +29,10 @@ export function Home() {
       <Tape>Crime scene · do not cross</Tape>
 
       <header className="relative px-5 pt-8 pb-6">
-        <p className="font-mono text-xs text-dim">DETECTIVE {badge ? `${badge.icon} ` : ''}{player.name.toUpperCase()}</p>
+        <button onClick={() => go({ name: 'profile' })} className="font-mono text-xs text-dim">
+          {player.progress.rank.title.toUpperCase()} {badge ? `${badge.icon} ` : ''}
+          {player.name.toUpperCase()} · <span className="text-tape">{player.progress.cluePoints.toLocaleString()} CP ›</span>
+        </button>
         <h1 className="mt-2 font-display text-[4.6rem] leading-[0.82] font-black uppercase">
           Who
           <br />
@@ -53,7 +56,11 @@ export function Home() {
         <Pill>⚖️ {player.items.subpoena}</Pill>
         <Pill>🧭 {player.items.trace}</Pill>
         <Pill>💡 {player.items.hint}</Pill>
-        <button onClick={() => go({ name: 'shop' })} className="ml-auto font-display text-sm font-bold tracking-widest text-tape uppercase underline underline-offset-4">
+        {player.progress.streakDays > 0 && <Pill tone="tape">🔥 {player.progress.streakDays}</Pill>}
+        <button onClick={() => go({ name: 'profile' })} className="ml-auto font-display text-sm font-bold tracking-widest text-paper uppercase underline underline-offset-4">
+          Profile
+        </button>
+        <button onClick={() => go({ name: 'shop' })} className="ml-3 font-display text-sm font-bold tracking-widest text-tape uppercase underline underline-offset-4">
           Shop ⭐
         </button>
       </section>

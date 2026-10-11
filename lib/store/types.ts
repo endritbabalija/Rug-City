@@ -13,6 +13,17 @@ export interface Purchase {
   createdAt: number
 }
 
+/** One player's standing in one season. Ties go to whoever reached the rating first. */
+export interface SeasonRating {
+  season: number
+  playerId: number
+  name: string
+  badge?: string
+  rating: number
+  cases: number
+  updatedAt: number
+}
+
 export interface Store {
   getPlayer(id: number): Promise<Player | null>
   /** Inserts the player unless one with the same id exists; returns whichever is stored. */
@@ -30,6 +41,16 @@ export interface Store {
   getPurchaseByCharge(chargeId: string): Promise<Purchase | null>
   /** Atomically moves a purchase from `from` to `to`. Returns null if it wasn't in `from`. */
   transitionPurchase(id: string, from: PurchaseStatus, to: PurchaseStatus, chargeId?: string): Promise<Purchase | null>
+
+  /**
+   * Record a player's season rating. Ratings only ever go up within a season, so a write
+   * never lowers what is stored: settles that finish out of order can't undo each other.
+   */
+  raiseSeasonRating(r: SeasonRating): Promise<void>
+  /** Ranked players of a season, best first, from `offset`, plus how many are ranked in total. */
+  getSeasonLeaderboard(season: number, limit: number, offset?: number): Promise<{ rows: SeasonRating[]; total: number }>
+  /** 1-based position of a player in a season, or null if they aren't ranked. */
+  getSeasonPosition(season: number, playerId: number): Promise<number | null>
 }
 
 export class ConflictError extends Error {}

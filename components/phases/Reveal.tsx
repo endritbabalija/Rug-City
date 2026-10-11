@@ -1,14 +1,23 @@
 'use client'
 
 import { useEffect } from 'react'
+import { api } from '@/lib/client/api'
+import { UNRATED_REASON } from '@/lib/game/progress'
+import type { PublicPlayer } from '@/lib/server'
 import { canShareStory, haptic, shareStory, shareToChat } from '@/lib/telegram/webapp'
 import { useGame } from '../GameContext'
 import { inviteLink, type PhaseProps } from '../Room'
 import { Button, Label, Stamp, Tape } from '../ui'
 
-export function Reveal({ room }: PhaseProps) {
-  const { go } = useGame()
+/** If points still haven't arrived this long after the verdict, stop waiting for them. */
+const SETTLE_WAIT_MS = 30_000
+
+export function Reveal({ room, now }: PhaseProps) {
+  const { go, setPlayer } = useGame()
   const r = room.result!
+  const award = r.myAward
+  const settled = award !== null
+  const waiting = !r.settled && now() - room.phaseStartedAt < SETTLE_WAIT_MS
   const c = room.case
   const caught = r.correct.culprit
   const minutes = Math.max(1, Math.round(r.elapsedSec / 60))
@@ -19,6 +28,27 @@ export function Reveal({ room }: PhaseProps) {
     if (caught) haptic.ok()
     else haptic.thud()
   }, [caught])
+
+  // Points are written when the room settles; pick up the new totals for the profile.
+  useEffect(() => {
+    if (!settled) return
+    api<{ player: PublicPlayer }>('/api/me')
+      .then((res) => setPlayer(res.player))
+      .catch(() => {})
+  }, [settled, setPlayer])
+
+  const isAnswer = (field: 'culprit' | 'motive' | 'trail', id: string) => r.answer[field] === id
+  const leads = r.crew.filter((p) => p.correct === 3)
+  const chips = award
+    ? ([
+        ['Culprit', award.points.culprit],
+        ['Motive', award.points.motive],
+        ['Money', award.points.trail],
+        ['Crew', award.points.crew],
+        ['Speed', award.points.speed],
+        [`🔥 ${award.streakDays}-day streak`, award.points.streak],
+      ] as const).filter(([, n]) => n > 0)
+    : []
 
   const suspect = (id: string) => c.suspects.find((s) => s.id === id)
   const rows = [
@@ -50,6 +80,45 @@ export function Reveal({ room }: PhaseProps) {
         <p className="mt-1 font-mono text-xs text-dim">time bonus +{r.points.time}</p>
       </div>
 
+      {(award || waiting) && (
+        <section className="mx-4 mb-5 animate-rise rounded-md border border-tape/40 bg-tape/10 p-4" style={{ animationDelay: '550ms' }}>
+          {!award ? (
+            <p className="animate-flicker font-display tracking-[0.2em] text-tape uppercase">Tallying your Clue Points…</p>
+          ) : award.unrated ? (
+            <>
+              <div className="font-display text-lg font-black uppercase">No Clue Points this time</div>
+              <p className="mt-1 text-sm text-paper/80">{UNRATED_REASON[award.unrated]}</p>
+            </>
+          ) : (
+            <>
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="font-mono text-4xl font-semibold text-tape tabular-nums">+{award.total}</span>
+                <span className="font-display text-sm font-bold tracking-widest text-dim uppercase">Clue Points</span>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {chips.map(([label, n]) => (
+                  <span key={label} className="rounded-full border border-tape/40 px-2 py-0.5 font-mono text-[11px] text-paper">
+                    {label} +{n}
+                  </span>
+                ))}
+              </div>
+              <p className="mt-3 text-xs text-dim">
+                {award.assisted
+                  ? 'Power-ups were used, so this case does not count toward season ratings.'
+                  : `Case score ${award.rating}/120 goes toward your season Detective Rating.`}
+              </p>
+              {award.rankUp && (
+                <div className="mt-4 text-center">
+                  <Stamp tone="ok" className="text-2xl">
+                    Promoted: {award.rankUp}
+                  </Stamp>
+                </div>
+              )}
+            </>
+          )}
+        </section>
+      )}
+
       <section className="space-y-3 px-4">
         {rows.map((row, i) => (
           <div key={row.label} className="paper animate-rise rounded-sm p-4" style={{ animationDelay: `${600 + i * 120}ms` }}>
@@ -69,6 +138,33 @@ export function Reveal({ room }: PhaseProps) {
             )}
           </div>
         ))}
+      </section>
+
+      <section className="mt-8 px-5">
+        <Label>The crew's votes</Label>
+        <ol className="mt-2 divide-y divide-line rounded-md border border-line bg-ink-2">
+          {r.crew.map((p) => (
+            <li key={p.id} className="flex items-center gap-3 px-4 py-2.5">
+              <span className="min-w-0 flex-1 truncate">
+                {p.badge ?? ''}
+                <b>{p.name}</b>
+                {leads.length > 0 && p.correct === 3 && <span className="ml-2 rounded-sm bg-tape px-1.5 font-display text-xs font-black text-ink uppercase">Lead detective</span>}
+              </span>
+              {p.vote ? (
+                <span className="flex gap-1 font-mono text-sm">
+                  {(['culprit', 'motive', 'trail'] as const).map((f) => (
+                    <span key={f} className={isAnswer(f, p.vote![f]) ? 'text-ok' : 'text-rug'} title={f}>
+                      {isAnswer(f, p.vote![f]) ? '✓' : '✗'}
+                    </span>
+                  ))}
+                </span>
+              ) : (
+                <span className="font-mono text-xs text-dim">no vote</span>
+              )}
+            </li>
+          ))}
+        </ol>
+        <p className="mt-1 font-mono text-[10px] text-dim">✓/✗ = culprit · motive · money trail</p>
       </section>
 
       <section className="mt-8 px-5">

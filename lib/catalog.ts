@@ -24,6 +24,16 @@ export const BADGES: Record<string, { name: string; icon: string }> = {
   whisperer: { name: 'Rug Whisperer', icon: '🧶' },
 }
 
+/** Season badges can't be bought: `s<season>-top10` for the top 10, `s<season>-elite` for the top 10%. */
+export const seasonBadge = (season: number, tier: 'top10' | 'elite') => `s${season}-${tier}`
+
+export function badgeInfo(id: string): { name: string; icon: string } | undefined {
+  if (BADGES[id]) return BADGES[id]
+  const m = /^s(\d+)-(top10|elite)$/.exec(id)
+  if (!m) return undefined
+  return m[2] === 'top10' ? { name: `Season ${m[1]} · Top 10`, icon: '🏆' } : { name: `Season ${m[1]} · Top 10%`, icon: '🎖️' }
+}
+
 export const SKUS: Sku[] = [
   { id: 'pack5', title: 'Case pack', description: 'Host 5 more cases, any time.', stars: 250, kind: 'pack', grant: { caseCredits: 5 }, icon: '🗂️' },
   { id: 'subpoena', title: 'Subpoena', description: 'One suspect must answer your next question truthfully.', stars: 25, kind: 'powerup', grant: { items: { subpoena: 1 } }, icon: '⚖️' },

@@ -8,6 +8,8 @@ import type { PublicPlayer } from '@/lib/server'
 import { bindBackButton, haptic, initTelegram, openInvoice } from '@/lib/telegram/webapp'
 import { GameContext, type GameCtx, type Screen } from './GameContext'
 import { Home } from './Home'
+import { Leaderboard } from './Leaderboard'
+import { Profile } from './Profile'
 import { Room } from './Room'
 import { Shop } from './Shop'
 import { Tape } from './ui'
@@ -122,6 +124,8 @@ export function Game() {
       <main className="safe-top safe-bottom mx-auto min-h-dvh max-w-xl">
         {screen.name === 'home' && <Home />}
         {screen.name === 'shop' && <Shop />}
+        {screen.name === 'profile' && <Profile />}
+        {screen.name === 'leaderboard' && <Leaderboard />}
         {screen.name === 'room' && <Room key={screen.code} code={screen.code} />}
       </main>
       <div className="pointer-events-none fixed inset-x-0 top-0 z-50 flex flex-col items-center gap-2 p-3 safe-top">

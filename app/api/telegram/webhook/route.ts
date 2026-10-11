@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { env } from '@/lib/env'
 import { handlePreCheckout, handleSuccessfulPayment, refundCharge } from '@/lib/payments'
+import { grantSeasonRewards } from '@/lib/season'
 import { botApi, miniAppLink } from '@/lib/telegram/bot-api'
 
 interface Message {
@@ -68,6 +69,18 @@ async function handleCommand(msg: Message) {
         return reply(chatId, `Refunded ${p.stars}⭐ for ${p.sku} to user ${p.userId}.`)
       } catch (err) {
         return reply(chatId, `Refund failed: ${(err as Error).message}`)
+      }
+    }
+    case '/season_rewards': {
+      // Admin only: /season_rewards <season>. Safe to repeat; nobody is rewarded twice.
+      if (!msg.from || !env().adminIds.includes(msg.from.id)) return
+      const season = Number(args[0])
+      if (!args[0]) return reply(chatId, 'Usage: /season_rewards <season number>')
+      try {
+        const r = await grantSeasonRewards(season)
+        return reply(chatId, `Season ${r.season}: ${r.ranked} ranked, ${r.rewarded} in the reward zone, ${r.granted} newly rewarded.`)
+      } catch (err) {
+        return reply(chatId, `Season rewards failed: ${(err as Error).message}`)
       }
     }
   }

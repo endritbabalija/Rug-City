@@ -177,7 +177,7 @@ export function revealHint(state: RoomState, c: CaseFile, actorId: number, now: 
   requireMember(state, actorId)
   requirePhase(state, 'investigate')
   if (state.hintsRevealed >= c.hints.length) fail('NO_MORE_HINTS', 'All hints for this case are already revealed.', 409)
-  return log({ ...state, hintsRevealed: state.hintsRevealed + 1 }, actorId, `${nameOf(state, actorId)} used a Hint.`, now)
+  return log({ ...state, hintsRevealed: state.hintsRevealed + 1, assisted: true }, actorId, `${nameOf(state, actorId)} used a Hint.`, now)
 }
 
 export function trace(state: RoomState, c: CaseFile, actorId: number, walletId: string, now: number): RoomState {
@@ -186,7 +186,7 @@ export function trace(state: RoomState, c: CaseFile, actorId: number, walletId: 
   const wallet = c.wallets.find((w) => w.id === walletId)
   if (!wallet) fail('UNKNOWN_WALLET', 'No such wallet.', 404)
   if (!wallet!.fundingHidden || state.traced.includes(walletId)) fail('ALREADY_KNOWN', "That wallet's source is already visible.", 409)
-  return log({ ...state, traced: [...state.traced, walletId] }, actorId, `${nameOf(state, actorId)} traced ${wallet!.address}.`, now)
+  return log({ ...state, traced: [...state.traced, walletId], assisted: true }, actorId, `${nameOf(state, actorId)} traced ${wallet!.address}.`, now)
 }
 
 export function subpoena(state: RoomState, c: CaseFile, actorId: number, suspectId: string, now: number): RoomState {
@@ -196,7 +196,7 @@ export function subpoena(state: RoomState, c: CaseFile, actorId: number, suspect
   const key = chatKey(actorId, suspectId)
   if (state.subpoenas[key]) fail('ALREADY_SUBPOENAED', 'Your subpoena on this suspect is still waiting for a question.', 409)
   const suspect = c.suspects.find((s) => s.id === suspectId)!
-  return log({ ...state, subpoenas: { ...state.subpoenas, [key]: true } }, actorId, `${nameOf(state, actorId)} subpoenaed ${suspect.name}.`, now)
+  return log({ ...state, subpoenas: { ...state.subpoenas, [key]: true }, assisted: true }, actorId, `${nameOf(state, actorId)} subpoenaed ${suspect.name}.`, now)
 }
 
 // ── Interrogation ──────────────────────────────────────────────────────────
@@ -281,6 +281,11 @@ export function timeBonus(elapsedSec: number) {
   // Full 20 points up to 10 minutes, sliding to 0 at 25 minutes.
   const minutes = elapsedSec / 60
   return Math.max(0, Math.min(20, Math.round((20 * (25 - minutes)) / 15)))
+}
+
+/** How many of culprit, motive and money trail a vote got right (0–3). */
+export function countCorrect(c: CaseFile, vote: Vote) {
+  return Number(vote.culprit === c.answer.culprit) + Number(vote.motive === c.answer.motive) + Number(vote.trail === c.answer.trail)
 }
 
 export function score(c: CaseFile, group: Vote, elapsedSec: number): RoomResult {

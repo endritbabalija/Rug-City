@@ -5,7 +5,7 @@ import type { CaseSummary } from '@/lib/cases'
 import type { Sku } from '@/lib/catalog'
 import type { PublicPlayer } from '@/lib/server'
 
-export type Screen = { name: 'home' } | { name: 'shop' } | { name: 'room'; code: string }
+export type Screen = { name: 'home' } | { name: 'shop' } | { name: 'profile' } | { name: 'leaderboard' } | { name: 'room'; code: string }
 
 export interface GameCtx {
   player: PublicPlayer

@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { ZodError } from 'zod'
 import { env } from './env'
 import { GameError } from './game/engine'
+import { progressSummary } from './game/progress'
 import { hasFreeCase, newPlayer, type Player } from './player'
 import { store } from './store'
 import { ConflictError } from './store/types'
@@ -82,6 +83,7 @@ export function publicPlayer(p: Player) {
     items: p.items,
     badges: p.badges,
     activeBadge: p.activeBadge ?? null,
+    progress: progressSummary(p, Date.now()),
   }
 }
 

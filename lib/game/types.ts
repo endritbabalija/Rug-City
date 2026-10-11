@@ -67,4 +67,23 @@ export interface RoomState {
   result?: RoomResult
   /** Players whose referral rewards were already settled by this room. */
   rewardsSettled?: boolean
+  /** Someone used a power-up, so this case doesn't count toward season ratings. */
+  assisted?: boolean
+  /** Clue Points each seat earned, written once when the room settles. key = player id */
+  awards?: Record<string, Award>
+}
+
+/** Why a finished case earned no Clue Points. */
+export type Unrated = 'solo' | 'no-vote' | 'replay' | 'daily-cap'
+
+export interface Award {
+  unrated?: Unrated
+  points: { culprit: number; motive: number; trail: number; crew: number; speed: number; streak: number }
+  total: number
+  /** This case's score toward the season rating, when it counted. */
+  rating?: number
+  assisted?: boolean
+  streakDays: number
+  /** New rank title, when this case pushed the player over a threshold. */
+  rankUp?: string
 }

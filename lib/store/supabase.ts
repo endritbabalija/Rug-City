@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { RoomState } from '../game/types'
 import type { Player } from '../player'
-import { CONFLICT, withRetries, type Purchase, type PurchaseStatus, type Store } from './types'
+import { CONFLICT, withRetries, type Purchase, type PurchaseStatus, type SeasonRating, type Store } from './types'
 
 interface PurchaseRow {
   id: string
@@ -21,6 +21,26 @@ const toPurchase = (r: PurchaseRow): Purchase => ({
   status: r.status,
   chargeId: r.charge_id ?? undefined,
   createdAt: Date.parse(r.created_at),
+})
+
+interface SeasonRatingRow {
+  season: number
+  player_id: number
+  name: string
+  badge: string | null
+  rating: number
+  cases: number
+  updated_at: string
+}
+
+const toRating = (r: SeasonRatingRow): SeasonRating => ({
+  season: r.season,
+  playerId: Number(r.player_id),
+  name: r.name,
+  badge: r.badge ?? undefined,
+  rating: r.rating,
+  cases: r.cases,
+  updatedAt: Date.parse(r.updated_at),
 })
 
 function check<T>(res: { data: T; error: { message: string } | null }): T {
@@ -109,6 +129,45 @@ export function createSupabaseStore(url: string, serviceKey: string): Store {
       if (chargeId) patch.charge_id = chargeId
       const rows = check(await db.from('purchases').update(patch).eq('id', id).eq('status', from).select('*'))
       return rows && rows.length ? toPurchase(rows[0] as PurchaseRow) : null
+    },
+
+    async raiseSeasonRating(r) {
+      const key = { season: r.season, player_id: r.playerId }
+      const row = { ...key, name: r.name, badge: r.badge ?? null, rating: r.rating, cases: r.cases, updated_at: new Date(r.updatedAt).toISOString() }
+      // Insert if missing, then raise only if higher: any order of concurrent writes ends at the max.
+      check(await db.from('season_ratings').upsert(row, { onConflict: 'season,player_id', ignoreDuplicates: true }))
+      check(await db.from('season_ratings').update(row).match(key).lt('rating', r.rating))
+      // Same rating with more cases (a 0-point case): update the count but keep the tie-break time.
+      check(await db.from('season_ratings').update({ cases: r.cases, name: r.name, badge: r.badge ?? null }).match(key).eq('rating', r.rating).lt('cases', r.cases))
+    },
+    async getSeasonLeaderboard(season, limit, offset = 0) {
+      if (limit <= 0) {
+        const res = await db.from('season_ratings').select('player_id', { count: 'exact', head: true }).eq('season', season).gt('rating', 0)
+        check(res)
+        return { rows: [], total: res.count ?? 0 }
+      }
+      const res = await db
+        .from('season_ratings')
+        .select('*', { count: 'exact' })
+        .eq('season', season)
+        .gt('rating', 0)
+        .order('rating', { ascending: false })
+        .order('updated_at', { ascending: true })
+        .order('player_id', { ascending: true })
+        .range(offset, offset + limit - 1)
+      const rows = check(res) as SeasonRatingRow[]
+      return { rows: rows.map(toRating), total: res.count ?? rows.length }
+    },
+    async getSeasonPosition(season, playerId) {
+      const mine = check(await db.from('season_ratings').select('*').eq('season', season).eq('player_id', playerId).maybeSingle()) as SeasonRatingRow | null
+      if (!mine || mine.rating <= 0) return null
+      const ahead = await db
+        .from('season_ratings')
+        .select('player_id', { count: 'exact', head: true })
+        .eq('season', season)
+        .or(`rating.gt.${mine.rating},and(rating.eq.${mine.rating},updated_at.lt."${mine.updated_at}")`)
+      check(ahead)
+      return (ahead.count ?? 0) + 1
     },
   }
   return s
