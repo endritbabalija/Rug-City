@@ -2,7 +2,7 @@
 // is not shared between serverless instances, so production must use Supabase.
 
 import type { Season } from '../game/progress'
-import type { CaseResultRow, CaseStats, RoomState } from '../game/types'
+import type { CaseResultRow, CaseStartRow, CaseStats, RoomState } from '../game/types'
 import type { Player } from '../player'
 import type { AppEvent, CaseRow, ChatRow, Purchase, PurchaseStatus, SeasonRating, Store } from './types'
 
@@ -29,6 +29,7 @@ export function createMemoryStore(): Store {
   const badges = new Map<number, Set<string>>()
   const rewards = new Set<string>()
   const results: CaseResultRow[] = []
+  const starts: CaseStartRow[] = []
   const chats: ChatRow[] = []
   const rooms = new Map<string, RoomState>()
   const purchases = new Map<string, Purchase>()
@@ -82,11 +83,17 @@ export function createMemoryStore(): Store {
       results.push(clone(row))
       return true
     },
-    async hasPlayed(playerId, caseId) {
-      return results.some((r) => r.playerId === playerId && r.caseId === caseId)
+    async recordCaseStart(row) {
+      if (starts.some((r) => r.playerId === row.playerId && r.caseId === row.caseId)) return false
+      starts.push(clone(row))
+      return true
+    },
+    async hasPlayed(playerId, caseId, exceptRoom) {
+      const match = (r: { playerId: number; caseId: string; roomCode: string }) => r.playerId === playerId && r.caseId === caseId && r.roomCode !== exceptRoom
+      return results.some(match) || starts.some(match)
     },
     async playedCaseIds(playerId) {
-      return [...new Set(results.filter((r) => r.playerId === playerId).map((r) => r.caseId))]
+      return [...new Set([...results, ...starts].filter((r) => r.playerId === playerId).map((r) => r.caseId))]
     },
     async recentResults(playerId, limit) {
       return clone(results.filter((r) => r.playerId === playerId).sort((a, b) => b.at - a.at).slice(0, limit))

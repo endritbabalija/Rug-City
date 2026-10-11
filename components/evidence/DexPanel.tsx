@@ -3,10 +3,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { HELP_PENALTY } from '@/lib/game/scoring'
 import type { PhaseProps } from '../Room'
-import { Button, Countdown, Label } from '../ui'
+import { Button, Confirm, Countdown, Label } from '../ui'
 import { ClueCard } from './ClueCard'
-
-const pct = (n: number) => `${Math.round(n * 100)}%`
+import { helpCost, pct } from './helpCost'
 
 /**
  * Detective Dex. Solo, he shows his clues one at a time when asked; in a crew his notes go
@@ -81,19 +80,9 @@ export function DexPanel({ room, run, busy, now }: PhaseProps) {
           </Button>
         )}
         {confirmHint ? (
-          <div className="rounded-md border border-rug/60 bg-ink-2 p-3">
-            <p className="text-sm text-paper/85">
-              A Dex hint costs {pct(HELP_PENALTY.dexHint)} of the case score{crew ? ' for everyone in the crew' : ''}. Ask anyway?
-            </p>
-            <div className="mt-3 flex gap-2">
-              <Button variant="danger" className="flex-1" busy={busy === 'dexHint'} onClick={hint}>
-                Give me the hint
-              </Button>
-              <Button variant="ghost" onClick={() => setConfirmHint(false)}>
-                Cancel
-              </Button>
-            </div>
-          </div>
+          <Confirm yes="Give me the hint" busy={busy === 'dexHint'} onYes={hint} onNo={() => setConfirmHint(false)}>
+            {helpCost('dexHint', { crew })}
+          </Confirm>
         ) : (
           <Button variant="ghost" className="w-full" disabled={dex.hintsLeft <= 0} busy={busy === 'dexHint'} onClick={() => setConfirmHint(true)}>
             {dex.hintsLeft > 0 ? `💡 Give me a hint (${dex.hintsLeft} left · −${pct(HELP_PENALTY.dexHint)})` : 'Dex is out of hints'}

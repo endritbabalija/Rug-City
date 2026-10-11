@@ -5,10 +5,11 @@ import { haptic } from '@/lib/telegram/webapp'
 import { ClueCard } from '../evidence/ClueCard'
 import { DexPanel } from '../evidence/DexPanel'
 import { Explorer } from '../evidence/Explorer'
+import { helpCost } from '../evidence/helpCost'
 import { Interrogation } from '../evidence/Interrogation'
 import { useGame } from '../GameContext'
 import type { PhaseProps } from '../Room'
-import { Button, Countdown, Label } from '../ui'
+import { Button, Confirm, Countdown, Label, timeLeft, useClock } from '../ui'
 
 type Tab = 'clues' | 'dex' | 'explorer' | 'suspects' | 'board'
 
@@ -16,11 +17,15 @@ export function Investigate(props: PhaseProps) {
   const { room, run, busy, now } = props
   const { player, buy } = useGame()
   const [tab, setTab] = useState<Tab>('clues')
-  const overtime = room.investigateEndsAt !== null && now() >= room.investigateEndsAt
+  const [confirm, setConfirm] = useState<'hint' | 'vote' | null>(null)
+  const at = useClock(now)
+  const solo = room.mode === 'solo'
+  const overtime = room.investigateEndsAt !== null && at >= room.investigateEndsAt
   const canCall = room.me.isHost || overtime
   const nameOf = (id: number) => room.players.find((p) => p.id === id)?.name ?? 'Someone'
 
   async function hint() {
+    setConfirm(null)
     if (player.items.hint <= 0 && !(await buy('hint'))) return
     await run({ type: 'hint' }, 'hint')
   }
@@ -37,7 +42,14 @@ export function Investigate(props: PhaseProps) {
     <div>
       <div className="sticky top-[57px] z-20 border-b border-line bg-ink/95 backdrop-blur">
         <div className="flex items-center justify-between px-4 pt-2">
-          {room.investigateEndsAt && <Countdown endsAt={room.investigateEndsAt} now={now} label="Time" />}
+          {room.investigateEndsAt && (
+            <Countdown
+              endsAt={room.investigateEndsAt}
+              now={now}
+              label="Suggested"
+              ended={solo ? "Time's up · speed points start dropping soon" : "Time's up · anyone can call the vote"}
+            />
+          )}
           <span className="font-mono text-[11px] text-dim">{room.mode === 'solo' ? 'Solo with Dex' : `${room.players.length} detectives`}</span>
         </div>
         <nav className="scroll-x flex gap-1 overflow-x-auto px-3 pt-2">
@@ -75,7 +87,7 @@ export function Investigate(props: PhaseProps) {
         {tab === 'suspects' && <Interrogation {...props} />}
         {tab === 'board' && (
           <div className="px-4">
-            <Label>Hints · shared with the crew</Label>
+            <Label>{solo ? 'Hints' : 'Hints · shared with the crew'}</Label>
             <div className="mt-2 space-y-2">
               {room.hints.map((h, i) => (
                 <div key={i} className="rounded-md border border-tape/40 bg-tape/10 p-3 text-[15px]">
@@ -83,12 +95,16 @@ export function Investigate(props: PhaseProps) {
                   {h}
                 </div>
               ))}
-              {room.hints.length < room.case.hintCount ? (
-                <Button variant="ghost" className="w-full" busy={busy === 'hint'} onClick={hint}>
+              {room.hints.length >= room.case.hintCount ? (
+                <p className="text-sm text-dim">All hints revealed.</p>
+              ) : confirm === 'hint' ? (
+                <Confirm yes="Reveal it" busy={busy === 'hint'} onYes={hint} onNo={() => setConfirm(null)}>
+                  {helpCost('hint', { owned: player.items.hint, crew: !solo })}
+                </Confirm>
+              ) : (
+                <Button variant="ghost" className="w-full" busy={busy === 'hint'} onClick={() => setConfirm('hint')}>
                   💡 Reveal hint {room.hints.length + 1}/{room.case.hintCount} {player.items.hint > 0 ? `(${player.items.hint} left)` : '· ⭐10'}
                 </Button>
-              ) : (
-                <p className="text-sm text-dim">All hints revealed.</p>
               )}
             </div>
 
@@ -101,17 +117,25 @@ export function Investigate(props: PhaseProps) {
               ))}
             </ol>
 
-            <Label className="mt-8">Crew</Label>
-            <p className="mt-1 text-sm text-paper/80">{room.players.map((p) => `${p.badge ?? ''}${p.name}`).join(' · ')}</p>
-            <p className="mt-1 text-xs text-dim">Host: {nameOf(room.hostId)}</p>
+            {!solo && (
+              <>
+                <Label className="mt-8">Crew</Label>
+                <p className="mt-1 text-sm text-paper/80">{room.players.map((p) => `${p.badge ?? ''}${p.name}`).join(' · ')}</p>
+                <p className="mt-1 text-xs text-dim">Host: {nameOf(room.hostId)}</p>
+              </>
+            )}
           </div>
         )}
       </div>
 
       <div className="safe-bottom fixed inset-x-0 bottom-0 z-30 border-t border-line bg-ink/95 px-5 pt-3 pb-3 backdrop-blur">
         <div className="mx-auto max-w-xl">
-          {canCall ? (
-            <Button variant="danger" className="w-full" busy={busy === 'callVote'} onClick={() => run({ type: 'callVote' })}>
+          {canCall && confirm === 'vote' && !overtime ? (
+            <Confirm yes="Vote now" busy={busy === 'callVote'} onYes={() => run({ type: 'callVote' })} onNo={() => setConfirm(null)}>
+              End the investigation and vote now? {room.investigateEndsAt ? `${timeLeft(room.investigateEndsAt, at)} left.` : ''}
+            </Confirm>
+          ) : canCall ? (
+            <Button variant="danger" className="w-full" busy={busy === 'callVote'} onClick={() => (overtime ? run({ type: 'callVote' }) : setConfirm('vote'))}>
               Call the vote
             </Button>
           ) : (

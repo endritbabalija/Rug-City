@@ -1,5 +1,5 @@
 import type { Season } from '../game/progress'
-import type { CaseMode, CaseResultRow, CaseStats, ChatMessage, RoomState } from '../game/types'
+import type { CaseMode, CaseResultRow, CaseStartRow, CaseStats, ChatMessage, RoomState } from '../game/types'
 import type { Player } from '../player'
 
 export type PurchaseStatus = 'pending' | 'paid' | 'refunded'
@@ -76,8 +76,11 @@ export interface Store {
 
   /** Returns false if this player already has a result for this room. */
   insertCaseResult(row: CaseResultRow): Promise<boolean>
-  hasPlayed(playerId: number, caseId: string): Promise<boolean>
-  /** Every case id the player has a result for. */
+  /** Records that the player saw the case's clues. Returns false if they already had (in any room). */
+  recordCaseStart(row: CaseStartRow): Promise<boolean>
+  /** The player finished or started this case, in any room but `exceptRoom`. */
+  hasPlayed(playerId: number, caseId: string, exceptRoom?: string): Promise<boolean>
+  /** Every case id the player has finished or started. */
   playedCaseIds(playerId: number): Promise<string[]>
   /** Newest first. */
   recentResults(playerId: number, limit: number): Promise<CaseResultRow[]>

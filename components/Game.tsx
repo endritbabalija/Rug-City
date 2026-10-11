@@ -60,8 +60,12 @@ export function Game() {
       .catch((e: unknown) => setBootError(e instanceof ApiError ? e.message : 'Could not reach the case files.'))
   }, [])
 
-  // Telegram's native back button returns to the case board from anywhere else.
-  useEffect(() => bindBackButton(screen.name === 'home' ? null : () => setScreen({ name: 'home' })), [screen.name])
+  // Telegram's native back button returns to the case board from anywhere else. A room binds
+  // its own, which asks first mid-case.
+  useEffect(() => {
+    if (screen.name === 'room') return
+    return bindBackButton(screen.name === 'home' ? null : () => setScreen({ name: 'home' }))
+  }, [screen.name])
 
   const setPlayer = useCallback((player: PublicPlayer) => setMe((m) => (m ? { ...m, player } : m)), [])
   const refresh = useCallback(async () => setMe(await api<MeResponse>('/api/me')), [])

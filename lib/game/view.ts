@@ -4,6 +4,7 @@ import { chatKey, cluesFor, countCorrect, questionsLeft, roomMode, suspectsFor }
 import { NO_HELP } from './scoring'
 import {
   ACCUSE_GRACE_MS,
+  BRIEFING_GRACE_MS,
   DEX_ID,
   INVESTIGATE_MS,
   type Award,
@@ -45,6 +46,8 @@ export interface RoomView {
   phaseStartedAt: number
   serverNow: number
   investigateEndsAt: number | null
+  /** When anyone, not just the host, can start the investigation. */
+  briefingGraceEndsAt: number | null
   accuseGraceEndsAt: number | null
   me: { id: number; isHost: boolean; ready: boolean }
   hostId: number
@@ -138,6 +141,7 @@ export function buildView(state: RoomState, c: CaseFile, playerId: number, now: 
     phaseStartedAt: state.phaseStartedAt,
     serverNow: now,
     investigateEndsAt: state.investigateStartedAt ? state.investigateStartedAt + INVESTIGATE_MS : null,
+    briefingGraceEndsAt: state.phase === 'briefing' ? state.phaseStartedAt + BRIEFING_GRACE_MS : null,
     accuseGraceEndsAt: state.phase === 'accuse' ? state.phaseStartedAt + ACCUSE_GRACE_MS : null,
     me: { id: playerId, isHost: state.hostId === playerId, ready: !!me?.ready },
     hostId: state.hostId,

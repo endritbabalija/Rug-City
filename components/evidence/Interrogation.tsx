@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from 'react'
 import { ApiError } from '@/lib/client/api'
 import { useGame } from '../GameContext'
 import type { PhaseProps } from '../Room'
-import { Button, Label } from '../ui'
+import { Button, Confirm, Label } from '../ui'
+import { helpCost } from './helpCost'
 import { SuspectCard } from './SuspectCard'
 
 export function Interrogation({ room, run, busy, ask }: PhaseProps) {
@@ -12,6 +13,7 @@ export function Interrogation({ room, run, busy, ask }: PhaseProps) {
   const [active, setActive] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
+  const [confirmSubpoena, setConfirmSubpoena] = useState(false)
   const endRef = useRef<HTMLDivElement>(null)
 
   const thread = active ? room.chats[active] : null
@@ -37,6 +39,7 @@ export function Interrogation({ room, run, busy, ask }: PhaseProps) {
   }
 
   async function subpoena() {
+    setConfirmSubpoena(false)
     if (!active) return
     if (player.items.subpoena <= 0 && !(await buy('subpoena'))) return
     if (await run({ type: 'subpoena', suspectId: active }, 'subpoena')) toast('Subpoena served. Their next answer must be the truth.', 'ok')
@@ -45,7 +48,11 @@ export function Interrogation({ room, run, busy, ask }: PhaseProps) {
   if (!active || !thread || !suspect) {
     return (
       <div className="px-4">
-        <p className="text-sm text-dim">These suspects reached out to you privately. Your crew can&apos;t see these chats, so share what you learn.</p>
+        <p className="text-sm text-dim">
+          {room.mode === 'solo'
+            ? 'These suspects reached out to you privately. Only you and Dex are on this one.'
+            : "These suspects reached out to you privately. Your crew can't see these chats, so share what you learn."}
+        </p>
         <div className="mt-3 space-y-3">
           {room.mySuspects.map((id) => {
             const s = room.case.suspects.find((x) => x.id === id)!
@@ -67,7 +74,12 @@ export function Interrogation({ room, run, busy, ask }: PhaseProps) {
 
   return (
     <div className="flex h-[calc(100dvh-178px)] flex-col px-4">
-      <button onClick={() => setActive(null)} className="mb-2 self-start font-display text-sm font-bold tracking-widest text-dim uppercase">
+      <button
+        onClick={() => {
+          setActive(null)
+          setConfirmSubpoena(false)
+        }}
+        className="mb-2 self-start font-display text-sm font-bold tracking-widest text-dim uppercase">
         ← All suspects
       </button>
       <SuspectCard suspect={suspect} compact />
@@ -95,11 +107,18 @@ export function Interrogation({ room, run, busy, ask }: PhaseProps) {
           {thread.subpoenaArmed ? (
             <span className="font-bold text-rug">⚖️ Subpoena armed</span>
           ) : (
-            <button onClick={subpoena} disabled={busy === 'subpoena'} className="text-tape underline underline-offset-2">
+            <button onClick={() => setConfirmSubpoena(true)} disabled={busy === 'subpoena' || confirmSubpoena} className="text-tape underline underline-offset-2">
               ⚖️ Subpoena {player.items.subpoena > 0 ? `(${player.items.subpoena})` : '· ⭐25'}
             </button>
           )}
         </div>
+        {confirmSubpoena && !thread.subpoenaArmed && (
+          <div className="mb-2">
+            <Confirm yes="Serve it" busy={busy === 'subpoena'} onYes={subpoena} onNo={() => setConfirmSubpoena(false)}>
+              {helpCost('subpoena', { owned: player.items.subpoena, crew: room.mode === 'crew' })}
+            </Confirm>
+          </div>
+        )}
         <form
           className="flex gap-2"
           onSubmit={(e) => {

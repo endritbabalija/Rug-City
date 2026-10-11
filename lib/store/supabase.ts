@@ -317,14 +317,29 @@ export function createSupabaseStore(url: string, serviceKey: string): Store {
       check(res)
       return true
     },
-    async hasPlayed(playerId, caseId) {
-      const res = await db.from('case_results').select('id', { count: 'exact', head: true }).match({ player_id: playerId, case_id: caseId })
+    async recordCaseStart(r) {
+      const res = await db.from('case_starts').insert({ player_id: r.playerId, case_id: r.caseId, room_code: r.roomCode, at: iso(r.at) })
+      if (res.error?.code === DUPLICATE) return false
       check(res)
-      return (res.count ?? 0) > 0
+      return true
+    },
+    async hasPlayed(playerId, caseId, exceptRoom) {
+      const counts = await Promise.all(
+        (['case_results', 'case_starts'] as const).map(async (table) => {
+          let q = db.from(table).select('player_id', { count: 'exact', head: true }).match({ player_id: playerId, case_id: caseId })
+          if (exceptRoom) q = q.neq('room_code', exceptRoom)
+          const res = await q
+          check(res)
+          return res.count ?? 0
+        }),
+      )
+      return counts.some((n) => n > 0)
     },
     async playedCaseIds(playerId) {
-      const rows = check(await db.from('case_results').select('case_id').eq('player_id', playerId)) as { case_id: string }[]
-      return [...new Set(rows.map((r) => r.case_id))]
+      const [finished, started] = await Promise.all(
+        (['case_results', 'case_starts'] as const).map(async (table) => check(await db.from(table).select('case_id').eq('player_id', playerId)) as { case_id: string }[]),
+      )
+      return [...new Set([...finished, ...started].map((r) => r.case_id))]
     },
     async recentResults(playerId, limit) {
       const rows = check(await db.from('case_results').select('*').eq('player_id', playerId).order('at', { ascending: false }).limit(limit))

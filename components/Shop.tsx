@@ -26,7 +26,7 @@ export function Shop() {
   }
 
   const sections = [
-    { kind: 'pack', title: 'Case packs', note: 'One free case a day. Packs let you host more.' },
+    { kind: 'pack', title: 'Case packs', note: 'One free case a day. Packs let you host or play solo more.' },
     { kind: 'powerup', title: 'Power-ups', note: 'Used during a case. Hints and Traces show up for the whole crew.' },
     { kind: 'badge', title: 'Detective badges', note: 'Cosmetic. Shows next to your name in lobbies and on verdict cards.' },
   ] as const
