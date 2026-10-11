@@ -31,7 +31,7 @@ export const RANKS = [
 
 export const UNRATED_REASON: Record<Unrated, string> = {
   'no-vote': "You didn't vote, so this one doesn't count.",
-  replay: 'You already finished this case, so replays earn nothing.',
+  replay: "You've already opened this case's evidence before, so replays earn nothing.",
   'daily-cap': `That's ${RATED_PER_DAY} rated cases today. Points resume tomorrow.`,
 }
 
@@ -116,7 +116,7 @@ export interface CaseOutcome {
   /** The crew's verdict; it carries the target time and the room's help. */
   result: RoomResult
   now: number
-  /** The player already has a `case_results` row for this case. */
+  /** The player already finished or started this case in another room. */
   alreadyPlayed: boolean
   /** The player's rated scores so far this season. */
   seasonScores: number[]

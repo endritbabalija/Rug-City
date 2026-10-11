@@ -22,9 +22,10 @@ export function Reveal({ room, now }: PhaseProps) {
   const settled = award !== null
   const waiting = !r.settled && now() - room.phaseStartedAt < SETTLE_WAIT_MS
   const c = room.case
+  const solo = room.mode === 'solo'
   const caught = r.correct.culprit
   const minutes = Math.max(1, Math.round(r.elapsedSec / 60))
-  const team = room.mode === 'solo' ? 'Dex and I' : 'Our crew'
+  const team = solo ? 'Dex and I' : 'Our crew'
   const headline = caught ? `${team} caught the rugger in ${minutes} min` : 'The rugger got away'
   const appLink = inviteLink('').replace(/\?(startapp|room)=$/, '')
   const before = r.points.culprit + r.points.motive + r.points.trail + r.points.time
@@ -50,7 +51,8 @@ export function Reveal({ room, now }: PhaseProps) {
         ['Culprit', award.points.culprit],
         ['Motive', award.points.motive],
         ['Money', award.points.trail],
-        ['Crew', award.points.crew],
+        // The `crew` bonus is for catching the culprit; solo there's no crew to credit.
+        [solo ? 'Solved' : 'Crew', award.points.crew],
         ['Speed', award.points.speed],
         [`🔥 ${award.streakDays}-day streak`, award.points.streak],
       ] as const).filter(([, n]) => n > 0)
@@ -141,7 +143,7 @@ export function Reveal({ room, now }: PhaseProps) {
               <p className="mt-3 text-xs text-dim">
                 Your case score {award.rating}/{CASE_MAX} goes toward your season Detective Rating.
                 {r.penalty > 0 &&
-                  ` Help cost the crew ${pct(r.penalty)} of ${PENALIZE_CLUE_POINTS ? 'the score and of your vote and speed points' : 'the score'}.`}
+                  ` Help cost ${solo ? 'you' : 'the crew'} ${pct(r.penalty)} of ${PENALIZE_CLUE_POINTS ? 'the score and of your vote and speed points' : 'the score'}.`}
               </p>
               {award.rankUp && (
                 <div className="mt-4 text-center">
@@ -165,7 +167,7 @@ export function Reveal({ room, now }: PhaseProps) {
               </span>
             </div>
             <p className="mt-1 font-type text-sm">
-              <span className="text-paper-ink/60">Crew said:</span> {row.you}
+              <span className="text-paper-ink/60">{solo ? 'You said:' : 'Crew said:'}</span> {row.you}
             </p>
             {!row.ok && (
               <p className="font-type text-sm">
@@ -176,32 +178,34 @@ export function Reveal({ room, now }: PhaseProps) {
         ))}
       </section>
 
-      <section className="mt-8 px-5">
-        <Label>The crew&apos;s votes</Label>
-        <ol className="mt-2 divide-y divide-line rounded-md border border-line bg-ink-2">
-          {r.crew.map((p) => (
-            <li key={p.id} className="flex items-center gap-3 px-4 py-2.5">
-              <span className="min-w-0 flex-1 truncate">
-                {p.badge ?? ''}
-                <b>{p.name}</b>
-                {leads.length > 0 && p.correct === 3 && <span className="ml-2 rounded-sm bg-tape px-1.5 font-display text-xs font-black text-ink uppercase">Lead detective</span>}
-              </span>
-              {p.vote ? (
-                <span className="flex gap-1 font-mono text-sm">
-                  {(['culprit', 'motive', 'trail'] as const).map((f) => (
-                    <span key={f} className={isAnswer(f, p.vote![f]) ? 'text-ok' : 'text-rug'} title={f}>
-                      {isAnswer(f, p.vote![f]) ? '✓' : '✗'}
-                    </span>
-                  ))}
+      {!solo && (
+        <section className="mt-8 px-5">
+          <Label>The crew&apos;s votes</Label>
+          <ol className="mt-2 divide-y divide-line rounded-md border border-line bg-ink-2">
+            {r.crew.map((p) => (
+              <li key={p.id} className="flex items-center gap-3 px-4 py-2.5">
+                <span className="min-w-0 flex-1 truncate">
+                  {p.badge ?? ''}
+                  <b>{p.name}</b>
+                  {leads.length > 0 && p.correct === 3 && <span className="ml-2 rounded-sm bg-tape px-1.5 font-display text-xs font-black text-ink uppercase">Lead detective</span>}
                 </span>
-              ) : (
-                <span className="font-mono text-xs text-dim">no vote</span>
-              )}
-            </li>
-          ))}
-        </ol>
-        <p className="mt-1 font-mono text-[10px] text-dim">✓/✗ = culprit · motive · money trail</p>
-      </section>
+                {p.vote ? (
+                  <span className="flex gap-1 font-mono text-sm">
+                    {(['culprit', 'motive', 'trail'] as const).map((f) => (
+                      <span key={f} className={isAnswer(f, p.vote![f]) ? 'text-ok' : 'text-rug'} title={f}>
+                        {isAnswer(f, p.vote![f]) ? '✓' : '✗'}
+                      </span>
+                    ))}
+                  </span>
+                ) : (
+                  <span className="font-mono text-xs text-dim">no vote</span>
+                )}
+              </li>
+            ))}
+          </ol>
+          <p className="mt-1 font-mono text-[10px] text-dim">✓/✗ = culprit · motive · money trail</p>
+        </section>
+      )}
 
       <section className="mt-8 px-5">
         <Label>What really happened</Label>

@@ -29,7 +29,7 @@ const { currentSeason } = await import('@/lib/seasons')
 const ai = await import('@/lib/ai/suspect')
 const { MEDIAN_AFTER_PLAYS } = await import('@/lib/game/scoring')
 const { DEX_RELEASE_SCHEDULE } = await import('@/lib/game/dex')
-const { DEX_ID } = await import('@/lib/game/types')
+const { BRIEFING_GRACE_MS, DEX_ID } = await import('@/lib/game/types')
 
 async function mkPlayer(id: number, referredBy?: number) {
   return store().createPlayer(newPlayer({ id, name: `P${id}` }, Date.now(), referredBy))
@@ -584,6 +584,126 @@ describe('Dex in the crew', () => {
       expect(await store().getRoom(code)).toEqual(before)
     } finally {
       write.mockRestore()
+    }
+  })
+})
+
+describe('suspects with Dex seated', () => {
+  it('lets a solo player question every suspect, including ones Dex used to hold', async () => {
+    const [me] = ids(1)
+    await mkPlayer(me)
+    const code = await rooms.createSolo(await fresh(me), 'mooncat-exit')
+    await rooms.act(code, await fresh(me), { type: 'ready' })
+    const view = await rooms.viewRoom(code, await fresh(me))
+    expect(view.mySuspects).toEqual(view.case.suspects.map((s) => s.id))
+    // The second suspect went to Dex's seat before the fix.
+    const room = await rooms.ask(code, await fresh(me), view.case.suspects[1].id, 'Where were you when the pool drained?')
+    expect(room.questionsUsed[String(me)]).toBe(1)
+  })
+})
+
+describe('a started case counts as played', () => {
+  it('makes a replay of an abandoned solo case unrated, and still charges for it', async () => {
+    const [me] = ids(1)
+    await mkPlayer(me)
+    const first = await rooms.createSolo(await fresh(me), 'mooncat-exit')
+    await rooms.act(first, await fresh(me), { type: 'ready' })
+    expect(await store().hasPlayed(me, 'mooncat-exit')).toBe(true)
+    // The room being played doesn't count against itself.
+    expect(await store().hasPlayed(me, 'mooncat-exit', first)).toBe(false)
+    expect(await store().playedCaseIds(me)).toContain('mooncat-exit')
+
+    // Abandoned at the investigation; back the next day with a credit.
+    await store().updatePlayer(me, (p) => ({ ...p, caseCredits: 1 }))
+    const second = await rooms.createSolo(await fresh(me), 'mooncat-exit')
+    expect((await fresh(me)).caseCredits).toBe(0)
+    await rooms.act(second, await fresh(me), { type: 'ready' })
+    await rooms.act(second, await fresh(me), { type: 'callVote' })
+    const done = await rooms.act(second, await fresh(me), { type: 'vote', vote: ANSWER })
+    expect(done.awards![String(me)]).toMatchObject({ unrated: 'replay', total: 0 })
+    expect((await fresh(me)).cluePoints ?? 0).toBe(0)
+  })
+
+  it('rates the room where the case was first started', async () => {
+    const [me] = ids(1)
+    await mkPlayer(me)
+    const code = await rooms.createSolo(await fresh(me), 'mooncat-exit')
+    await rooms.act(code, await fresh(me), { type: 'ready' })
+    await rooms.act(code, await fresh(me), { type: 'callVote' })
+    const done = await rooms.act(code, await fresh(me), { type: 'vote', vote: ANSWER })
+    expect(done.awards![String(me)].unrated).toBeUndefined()
+  })
+
+  it('records a start for every human seat in a crew, and none in a playtest', async () => {
+    const [host, a, b, admin] = ids(4)
+    for (const id of [host, a, b, admin]) await mkPlayer(id)
+    const code = await lobbyWith(host, [a, b])
+    await rooms.act(code, await fresh(host), { type: 'start' })
+    await rooms.act(code, await fresh(host), { type: 'skip' })
+    for (const id of [host, a, b]) expect(await store().playedCaseIds(id)).toEqual(['mooncat-exit'])
+
+    process.env.ADMIN_TELEGRAM_IDS = String(admin)
+    try {
+      const test = await rooms.createPlaytest(await fresh(admin), 'mooncat-exit')
+      await rooms.act(test, await fresh(admin), { type: 'ready' })
+      expect(await store().playedCaseIds(admin)).toEqual([])
+    } finally {
+      delete process.env.ADMIN_TELEGRAM_IDS
+    }
+  })
+
+  it('still charges and writes an unrated replay when soloing a closed case', async () => {
+    const [host, a, b] = ids(3)
+    for (const id of [host, a, b]) await mkPlayer(id)
+    await playThrough(await lobbyWith(host, [a, b]), host, { [host]: ANSWER, [a]: ANSWER, [b]: ANSWER })
+
+    // a joined, so their free case is still there: the solo spends it.
+    expect((await fresh(a)).freeCaseDay).toBeUndefined()
+    const code = await rooms.createSolo(await fresh(a), 'mooncat-exit')
+    expect((await fresh(a)).freeCaseDay).toBeDefined()
+    await rooms.act(code, await fresh(a), { type: 'ready' })
+    await rooms.act(code, await fresh(a), { type: 'callVote' })
+    await rooms.act(code, await fresh(a), { type: 'vote', vote: ANSWER })
+    const row = (await store().recentResults(a, 5)).find((r) => r.roomCode === code)
+    expect(row).toMatchObject({ unrated: 'replay', total: 0 })
+  })
+})
+
+describe('the briefing grace', () => {
+  it('lets any member start the investigation once the host has been gone long enough', async () => {
+    const [host, a, b] = ids(3)
+    for (const id of [host, a, b]) await mkPlayer(id)
+    const code = await lobbyWith(host, [a, b])
+    await rooms.act(code, await fresh(host), { type: 'start' })
+    await expect(rooms.act(code, await fresh(a), { type: 'skip' })).rejects.toMatchObject({ code: 'HOST_ONLY' })
+
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + BRIEFING_GRACE_MS)
+    try {
+      expect((await rooms.viewRoom(code, await fresh(a))).briefingGraceEndsAt).toBeLessThanOrEqual(Date.now())
+      const started = await rooms.act(code, await fresh(a), { type: 'skip' })
+      expect(started.phase).toBe('investigate')
+    } finally {
+      clock.mockRestore()
+    }
+    for (const id of [host, a, b]) expect(await store().playedCaseIds(id)).toEqual(['mooncat-exit'])
+  })
+})
+
+describe('closing the vote early', () => {
+  it('still works for the host and writes no-vote for players who did not vote', async () => {
+    const [host, a, b] = ids(3)
+    for (const id of [host, a, b]) await mkPlayer(id)
+    const code = await lobbyWith(host, [a, b])
+    await rooms.act(code, await fresh(host), { type: 'start' })
+    await rooms.act(code, await fresh(host), { type: 'skip' })
+    await rooms.act(code, await fresh(host), { type: 'callVote' })
+    await rooms.act(code, await fresh(host), { type: 'vote', vote: ANSWER })
+    const done = await rooms.act(code, await fresh(host), { type: 'closeVote' })
+    expect(done.phase).toBe('reveal')
+    expect(done.awards![String(host)].unrated).toBeUndefined()
+    for (const id of [a, b]) {
+      expect(done.awards![String(id)]).toMatchObject({ unrated: 'no-vote', total: 0 })
+      expect((await store().recentResults(id, 5)).find((r) => r.roomCode === code)).toMatchObject({ unrated: 'no-vote' })
     }
   })
 })

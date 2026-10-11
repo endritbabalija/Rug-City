@@ -4,6 +4,8 @@ export const MIN_PLAYERS = 3
 export const MAX_PLAYERS = 6
 /** Suggested investigation time; after it runs out, anyone can call the vote. */
 export const INVESTIGATE_MS = 12 * 60 * 1000
+/** After this long in the briefing, anyone in the case can start the investigation. */
+export const BRIEFING_GRACE_MS = 3 * 60 * 1000
 /** After this long in the vote, anyone can close it with the votes that are in. */
 export const ACCUSE_GRACE_MS = 3 * 60 * 1000
 /** Live interrogation questions each player gets per case (Subpoena answers are extra). */
@@ -137,6 +139,14 @@ export interface Award {
   streakDays: number
   /** New rank title, when this case pushed the player over a threshold. */
   rankUp?: string
+}
+
+/** One `case_starts` row: the first room in which a player saw a case's clues. */
+export interface CaseStartRow {
+  playerId: number
+  caseId: string
+  roomCode: string
+  at: number
 }
 
 /** One `case_results` row: one player's finished room. */

@@ -65,22 +65,61 @@ export function Pill({ children, tone = 'dim' }: { children: ReactNode; tone?: '
   return <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${tones[tone]}`}>{children}</span>
 }
 
-export function Countdown({ endsAt, now, label }: { endsAt: number; now: () => number; label: string }) {
+/** Re-renders every second and returns the (server-adjusted) time, for screens that change when a timer runs out. */
+export function useClock(now: () => number) {
   const [, tick] = useState(0)
   useEffect(() => {
     const t = setInterval(() => tick((n) => n + 1), 1000)
     return () => clearInterval(t)
   }, [])
-  const left = Math.max(0, endsAt - now())
-  const m = Math.floor(left / 60000)
-  const s = Math.floor((left % 60000) / 1000)
+  return now()
+}
+
+/** `m:ss` until `endsAt`, 0:00 once it has passed. */
+export function timeLeft(endsAt: number, at: number) {
+  const left = Math.max(0, endsAt - at)
+  return `${Math.floor(left / 60000)}:${Math.floor((left % 60000) / 1000).toString().padStart(2, '0')}`
+}
+
+/** `ended` replaces the countdown once it reaches zero. */
+export function Countdown({ endsAt, now, label, ended }: { endsAt: number; now: () => number; label: string; ended?: string }) {
+  const at = useClock(now)
+  const left = Math.max(0, endsAt - at)
+  if (left === 0 && ended) return <div className="py-1 font-mono text-xs font-semibold text-rug">{ended}</div>
   const urgent = left < 60000
   return (
     <div className={`flex items-baseline gap-2 font-mono text-sm ${urgent ? 'animate-flicker text-rug' : 'text-tape'}`}>
       <span className="text-[10px] uppercase tracking-widest text-dim">{label}</span>
-      <span className="text-lg font-semibold tabular-nums">
-        {left === 0 ? 'OVERTIME' : `${m}:${s.toString().padStart(2, '0')}`}
-      </span>
+      <span className="text-lg font-semibold tabular-nums">{left === 0 ? 'OVERTIME' : timeLeft(endsAt, at)}</span>
+    </div>
+  )
+}
+
+/** An inline "are you sure?" box: the pattern for anything that costs Stars, points or a player's case. */
+export function Confirm({
+  children,
+  yes,
+  onYes,
+  onNo,
+  busy,
+}: {
+  children: ReactNode
+  yes: string
+  onYes: () => void
+  onNo: () => void
+  busy?: boolean
+}) {
+  return (
+    <div className="rounded-md border border-rug/60 bg-ink-2 p-3 text-left">
+      <p className="font-sans text-sm normal-case text-paper/85">{children}</p>
+      <div className="mt-3 flex gap-2">
+        <Button variant="danger" className="flex-1" busy={busy} onClick={onYes}>
+          {yes}
+        </Button>
+        <Button variant="ghost" onClick={onNo}>
+          Cancel
+        </Button>
+      </div>
     </div>
   )
 }

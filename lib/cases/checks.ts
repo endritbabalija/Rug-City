@@ -7,6 +7,8 @@ import type { CaseFile } from './types'
 
 /** Seat counts a crew case can be dealt to. */
 export const SEAT_COUNTS = [3, 4, 5, 6] as const
+/** Human counts suspects are dealt to: solo (1), a crew with Dex (2–5), a crew without him (3–6). */
+export const HUMAN_COUNTS = [1, 2, 3, 4, 5, 6] as const
 
 /** Everything wrong with a case's internal consistency; empty when it passes. */
 export function staticProblems(c: CaseFile): string[] {
@@ -41,12 +43,16 @@ export function staticProblems(c: CaseFile): string[] {
     for (const id of proof) if (!clueIds.has(id)) problems.push(`Culprit proof uses unknown clue "${id}"`)
   }
 
+  for (const n of HUMAN_COUNTS) {
+    const suspectHands = dealSuspects(c, n)
+    if (suspectHands.some((h) => h.length === 0)) problems.push(`${n} humans: a player gets no suspect`)
+    if (new Set(suspectHands.flat()).size !== suspectIds.size) problems.push(`${n} humans: a suspect talks to nobody`)
+  }
   for (const n of SEAT_COUNTS) {
     const hands = dealClues(c, n)
-    const suspectHands = dealSuspects(c, n)
     if (hands.some((h) => h.length === 0)) problems.push(`${n} seats: a player gets no clue`)
-    if (suspectHands.some((h) => h.length === 0 || h.length > 2)) problems.push(`${n} seats: a player gets no suspect or more than two`)
-    if (new Set(suspectHands.flat()).size !== suspectIds.size) problems.push(`${n} seats: a suspect talks to nobody`)
+    // A crew without Dex: every seat is human.
+    if (dealSuspects(c, n).some((h) => h.length > 2)) problems.push(`${n} seats: a player gets more than two suspects`)
     hands.forEach((hand, seat) => {
       for (const proof of c.culpritProofs)
         if (proof.every((id) => hand.includes(id))) problems.push(`${n} seats: seat ${seat + 1} alone holds the proof ${proof.join('+')}`)

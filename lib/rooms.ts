@@ -15,7 +15,7 @@ import { GameError } from './game/engine'
 import * as dex from './game/dex'
 import { applyAward, awardCase, REFERRAL_POINTS, seasonRating } from './game/progress'
 import { targetFor } from './game/scoring'
-import { DEX_ID, type Award, type ChatMessage, type RoomState, type Vote } from './game/types'
+import { type Award, type ChatMessage, type RoomState, type Vote } from './game/types'
 import { buildView } from './game/view'
 import { applyGrant, consumeCase, hasFreeCase, spendItem, type Player } from './player'
 import { currentSeason } from './seasons'
@@ -197,13 +197,13 @@ export async function act(code: string, player: Player, action: RoomAction) {
     case 'start': {
       const minPlayers = minPlayersFor(player.id)
       const started = await chargedStep(code, player, ...caseCharge(), (s, _c, now) => engine.start(s, player.id, now, minPlayers))
-      track('case_start', player.id, { caseId: started.caseId, mode: engine.roomMode(started), seats: humanSeats(started).length, code })
+      track('case_start', player.id, { caseId: started.caseId, mode: engine.roomMode(started), seats: engine.humanSeats(started).length, code })
       return started
     }
     case 'ready':
-      return mutate(code, (s, _c, now) => engine.ready(s, player.id, now))
+      return recordStarts(await mutate(code, (s, _c, now) => engine.ready(s, player.id, now)))
     case 'skip':
-      return mutate(code, (s, _c, now) => engine.skipBriefing(s, player.id, now))
+      return recordStarts(await mutate(code, (s, _c, now) => engine.skipBriefing(s, player.id, now)))
     case 'callVote':
       return mutate(code, (s, _c, now) => engine.callVote(s, player.id, now))
     case 'vote': {
@@ -309,6 +309,23 @@ export async function ask(code: string, player: Player, suspectId: string, text:
 }
 
 /**
+ * Once the investigation begins every seat has seen the clues, so the case counts as played
+ * for them even if they never finish it. Safe to repeat: only a player's first start is kept.
+ */
+async function recordStarts(room: RoomState) {
+  if (room.phase === 'briefing' || room.playtest) return room
+  const at = room.investigateStartedAt ?? Date.now()
+  await Promise.all(
+    engine.humanSeats(room).map((playerId) =>
+      store()
+        .recordCaseStart({ playerId, caseId: room.caseId, roomCode: room.code, at })
+        .catch((err) => console.error('Case start write failed', room.code, playerId, err)),
+    ),
+  )
+  return room
+}
+
+/**
  * Runs once per finished room: Clue Points and season ratings for every seat, plus the
  * referral bonus (once a referred player finishes their first rated case, they and the
  * host who brought them each get a free case, and the host gets Clue Points).
@@ -337,7 +354,7 @@ export async function settleAfter(state: RoomState) {
     .catch((err) => console.error('Case plays count failed', settled.code, err))
   const awards: Record<string, Award> = {}
   await Promise.all(
-    humanSeats(settled).map(async (id) => {
+    engine.humanSeats(settled).map(async (id) => {
       try {
         const award = await settleSeat(settled, caseFile, id, now)
         if (award) awards[String(id)] = award
@@ -349,15 +366,13 @@ export async function settleAfter(state: RoomState) {
   return store().updateRoom(state.code, (s) => ({ ...s, awards: { ...s.awards, ...awards } }))
 }
 
-/** Seats held by players, without Dex. */
-const humanSeats = (room: RoomState) => room.seats.filter((id) => id !== DEX_ID)
-
 /** Settles one seat; returns null if this room was already settled for them. */
 async function settleSeat(room: RoomState, caseFile: CaseFile, id: number, now: number): Promise<Award | null> {
   const season = await currentSeason(now)
   const [before, alreadyPlayed, seasonScores] = await Promise.all([
     store().getPlayer(id),
-    store().hasPlayed(id, caseFile.id),
+    // This room's own start doesn't count against it.
+    store().hasPlayed(id, caseFile.id, room.code),
     store().seasonScores(id, season),
   ])
   if (!before) throw new Error(`Player ${id} not found`)
@@ -365,7 +380,7 @@ async function settleSeat(room: RoomState, caseFile: CaseFile, id: number, now: 
     code: room.code,
     caseFile,
     mode: engine.roomMode(room),
-    seats: humanSeats(room).length,
+    seats: engine.humanSeats(room).length,
     vote: room.votes[String(id)],
     result: room.result!,
     now,

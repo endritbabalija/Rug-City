@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import * as engine from '@/lib/game/engine'
 import { dealClues, dealSuspects } from '@/lib/game/engine'
+import { DEX_ID } from '@/lib/game/types'
 
 // Static checks standing in for the concept doc's "blind solver" gate:
 // every case must be internally consistent, and no single player may ever hold
@@ -93,7 +95,7 @@ describe.each(CASES.map((c) => [c.title, c] as const))('%s', (_title, c) => {
       const hands = dealClues(c, n)
       const suspectHands = dealSuspects(c, n)
 
-      it('gives every player at least one clue and one suspect', () => {
+      it('gives every player at least one clue and one or two suspects', () => {
         for (const h of hands) expect(h.length).toBeGreaterThan(0)
         for (const h of suspectHands) expect(h.length).toBeGreaterThan(0)
         for (const h of suspectHands) expect(h.length).toBeLessThanOrEqual(2)
@@ -110,6 +112,29 @@ describe.each(CASES.map((c) => [c.title, c] as const))('%s', (_title, c) => {
           }
         }
       })
+    })
+  }
+})
+
+describe.each(CASES.map((c) => [c.title, c] as const))('suspects reachable on %s', (_title, c) => {
+  const suspectIds = new Set(c.suspects.map((s) => s.id))
+  const T0 = 1_000_000
+  const reachable = (s: ReturnType<typeof engine.createRoom>) => new Set(engine.humanSeats(s).flatMap((id) => engine.suspectsFor(s, c, id)))
+
+  it('solo: the player gets every suspect, and Dex none', () => {
+    const s = engine.createSoloRoom('SOLO1', c, { id: 1, name: 'Ana' }, T0)
+    expect(new Set(engine.suspectsFor(s, c, 1))).toEqual(suspectIds)
+    expect(engine.suspectsFor(s, c, DEX_ID)).toEqual([])
+  })
+
+  for (const humans of [2, 3, 4, 5]) {
+    it(`a crew of ${humans} with Dex: every suspect talks to a human`, () => {
+      let s = engine.createRoom('CREW1', c, { id: 1, name: 'P1' }, T0)
+      for (let id = 2; id <= humans; id++) s = engine.join(s, { id, name: `P${id}` }, T0)
+      s = engine.start({ ...s, dexSeated: true }, 1, T0)
+      expect(s.seats).toContain(DEX_ID)
+      expect(reachable(s)).toEqual(suspectIds)
+      for (const id of engine.humanSeats(s)) expect(engine.suspectsFor(s, c, id).length).toBeGreaterThan(0)
     })
   }
 })

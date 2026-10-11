@@ -95,7 +95,7 @@ export function District({ id }: { id: string }) {
       <section className="space-y-5 px-5">
         {d && <Label>{d.state === 'open' ? 'Case files' : 'Teaser case'}</Label>}
         {inside.map((c, i) => (
-          <CaseCard key={c.id} c={c} index={i} showPlayed />
+          <CaseCard key={c.id} c={c} index={i} />
         ))}
         {!d && (
           <Button variant="ghost" className="w-full" onClick={() => go({ name: 'home' })}>

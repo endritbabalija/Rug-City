@@ -3,14 +3,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRoom, type RoomData } from '@/hooks/useRoom'
 import { ApiError, isTelegram } from '@/lib/client/api'
-import { canFullscreen, onFullscreenChange, setClosingConfirmation, setFullscreen, webApp } from '@/lib/telegram/webapp'
+import { forgetRoom, rememberRoom } from '@/lib/client/lastRoom'
+import { bindBackButton, canFullscreen, onFullscreenChange, setClosingConfirmation, setFullscreen, webApp } from '@/lib/telegram/webapp'
 import { Accuse } from './phases/Accuse'
 import { Briefing } from './phases/Briefing'
 import { Investigate } from './phases/Investigate'
 import { Lobby } from './phases/Lobby'
 import { Reveal } from './phases/Reveal'
 import { useGame } from './GameContext'
-import { Button, Tape } from './ui'
+import { Button, Sheet, Tape } from './ui'
 
 export interface PhaseProps {
   room: RoomData
@@ -42,8 +43,24 @@ export function Room({ code }: { code: string }) {
   const { room, error, act, ask, now } = useRoom(code, setPlayer)
   const [busy, setBusy] = useState<string | null>(null)
   const [fullscreen, setFs] = useState(() => !!webApp()?.isFullscreen)
+  const [confirmLeave, setConfirmLeave] = useState(false)
   const joinTried = useRef(false)
   const lastPhase = useRef<string | null>(null)
+  const live = !!room && room.member && room.phase !== 'lobby' && room.phase !== 'reveal'
+  const liveRef = useRef(live)
+  useEffect(() => {
+    liveRef.current = live
+  }, [live])
+
+  // Mid-case, going back asks first: the case keeps running without you.
+  const back = useCallback(() => (liveRef.current ? setConfirmLeave(true) : go({ name: 'home' })), [go])
+  useEffect(() => bindBackButton(back), [back])
+
+  // Home offers a way back into a case in progress; a finished or closed case is forgotten.
+  useEffect(() => {
+    if (room?.member && room.phase !== 'reveal') rememberRoom(code)
+    else if (room?.phase === 'reveal' || error?.code === 'NO_ROOM') forgetRoom(code)
+  }, [code, room?.member, room?.phase, error?.code])
 
   const run = useCallback(
     async (action: Record<string, unknown>, key = String(action.type)) => {
@@ -74,13 +91,12 @@ export function Room({ code }: { code: string }) {
   // Go fullscreen when the case starts, and warn before closing mid-case.
   useEffect(() => {
     if (!room) return
-    const live = room.phase !== 'lobby' && room.phase !== 'reveal' && room.member
     setClosingConfirmation(live)
     // Solo rooms open straight on the briefing.
     const opened = room.mode === 'solo' ? lastPhase.current === null : lastPhase.current === 'lobby'
     if (opened && room.phase === 'briefing') setFullscreen(true)
     lastPhase.current = room.phase
-  }, [room])
+  }, [room, live])
 
   useEffect(() => () => setClosingConfirmation(false), [])
 
@@ -122,7 +138,7 @@ export function Room({ code }: { code: string }) {
     <div className="pb-8">
       <div className="sticky top-0 z-30 flex items-center gap-3 border-b border-line bg-ink/95 px-4 py-2 backdrop-blur">
         {!isTelegram() && (
-          <button onClick={() => go({ name: 'home' })} className="text-dim" aria-label="Back">
+          <button onClick={back} className="text-dim" aria-label="Back">
             ←
           </button>
         )}
@@ -144,6 +160,18 @@ export function Room({ code }: { code: string }) {
       {room.phase === 'investigate' && <Investigate {...props} />}
       {room.phase === 'accuse' && <Accuse {...props} />}
       {room.phase === 'reveal' && <Reveal {...props} />}
+
+      <Sheet open={confirmLeave} onClose={() => setConfirmLeave(false)} title="Leave the case?">
+        <p className="text-[15px] text-paper/85">It keeps running and you can come back from Home.</p>
+        <div className="mt-5 flex gap-2">
+          <Button variant="danger" className="flex-1" onClick={() => go({ name: 'home' })}>
+            Leave
+          </Button>
+          <Button variant="ghost" className="flex-1" onClick={() => setConfirmLeave(false)}>
+            Stay
+          </Button>
+        </div>
+      </Sheet>
     </div>
   )
 }

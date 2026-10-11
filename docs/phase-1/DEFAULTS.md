@@ -16,6 +16,7 @@ To change one before its slice starts, edit this file. After the slice is merged
 | Dex sharing clues (solo) | One clue each time you ask, free | `lib/game/dex.ts` | 3 |
 | Dex hints | 2 per case, free, each with the hint penalty. Shop Hints still work after that | `DEX_FREE_HINTS = 2` | 3 |
 | Dex in the crew | Releases his clues to the group feed on a timer: 30 s, then one every 2 min. Doesn't vote | `DEX_RELEASE_SCHEDULE`, `lib/game/dex.ts` | 4 |
+| Briefing grace | The host can start the investigation any time; after 3 min in the briefing, any member can | `BRIEFING_GRACE_MS`, `lib/game/types.ts` | 6b |
 | Crew minimum with Dex | 2 humans + Dex | `MIN_HUMANS_WITH_DEX = 2`, `lib/game/types.ts` | 4 |
 | Day-one cases | 3 free cases on the signup UTC day, then 1 free case a day | `DAY_ONE_FREE_CASES = 3`, `lib/player.ts` | 7 |
 | Tutorial | A player's first case is `mooncat-exit` with Dex's tips on. No separate tutorial case | `TUTORIAL_CASE_ID`, `lib/game/dex.ts` | 7 |

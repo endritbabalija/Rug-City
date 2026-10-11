@@ -1,14 +1,44 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import type { RoomData } from '@/hooks/useRoom'
+import { api, ApiError } from '@/lib/client/api'
+import { lastRoom, rememberRoom } from '@/lib/client/lastRoom'
 import { CaseCard } from './CaseCard'
 import { DistrictMap } from './District'
 import { useGame } from './GameContext'
 import { Button, Label, Pill, Stamp, Tape } from './ui'
 
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
+
+/** The case this player left mid-way, if it's still running and they're in it. */
+function useOpenCase() {
+  const [open, setOpen] = useState<string | null>(null)
+  useEffect(() => {
+    const code = lastRoom()
+    if (!code) return
+    let cancelled = false
+    api<RoomData>(`/api/rooms/${code}`)
+      .then((room) => {
+        const running = room.member && room.phase !== 'reveal'
+        if (!running) rememberRoom(null)
+        if (!cancelled) setOpen(running ? code : null)
+      })
+      .catch((e: unknown) => {
+        // Gone or never ours: forget it. A network error keeps it for next time.
+        if (e instanceof ApiError && e.status === 404) rememberRoom(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+  return open
+}
+
 export function Home() {
   const { player, cases, badges, flags, isAdmin, go, toast } = useGame()
   const [code, setCode] = useState('')
+  const openCase = useOpenCase()
 
   const badge = player.activeBadge ? badges[player.activeBadge] : null
   const { season } = player.progress
@@ -19,10 +49,19 @@ export function Home() {
     <div className="pb-10">
       <Tape>Crime scene · do not cross</Tape>
 
+      {openCase && (
+        <button
+          onClick={() => go({ name: 'room', code: openCase })}
+          className="mx-5 mt-4 block w-[calc(100%-2.5rem)] animate-rise rounded-md border border-rug bg-rug/15 px-4 py-3 text-left font-mono text-sm text-paper"
+        >
+          Case {openCase} in progress · <span className="font-semibold text-tape">Back to it ›</span>
+        </button>
+      )}
+
       <header className="relative px-5 pt-8 pb-6">
         <button onClick={() => go({ name: 'profile' })} className="font-mono text-xs text-dim">
           {player.progress.rank.title.toUpperCase()} {badge ? `${badge.icon} ` : ''}
-          {player.name.toUpperCase()} · <span className="text-tape">{player.progress.cluePoints.toLocaleString()} CP ›</span>
+          {player.name.toUpperCase()} · <span className="text-tape">{player.progress.cluePoints.toLocaleString()} Clue Points ›</span>
         </button>
         <h1 className="mt-2 font-display text-[4.6rem] leading-[0.82] font-black uppercase">
           Who
@@ -33,8 +72,8 @@ export function Home() {
           </span>
         </h1>
         <p className="mt-4 max-w-sm text-[15px] leading-snug text-paper/80">
-          A project just got rugged. Your crew has 20 minutes to work out <b className="text-tape">who</b>, <b className="text-tape">why</b>, and{' '}
-          <b className="text-tape">where the money went</b>.
+          A project just got rugged. Work out <b className="text-tape">who</b>, <b className="text-tape">why</b>, and{' '}
+          <b className="text-tape">where the money went</b>, solo with Dex or with your crew.
         </p>
         <div className="absolute top-10 right-5">
           <Stamp className="text-lg">Case open</Stamp>
@@ -48,11 +87,11 @@ export function Home() {
       )}
 
       <section className="mx-5 flex flex-wrap items-center gap-2 border-y border-line py-3">
-        {player.freeCaseAvailable ? <Pill tone="ok">● Free case today</Pill> : <Pill>Free case used</Pill>}
-        <Pill tone="tape">🗂️ {player.caseCredits} cases</Pill>
-        <Pill>⚖️ {player.items.subpoena}</Pill>
-        <Pill>🧭 {player.items.trace}</Pill>
-        <Pill>💡 {player.items.hint}</Pill>
+        {player.freeCaseAvailable ? <Pill tone="ok">● Free case today</Pill> : <Pill>Free case: used today</Pill>}
+        <Pill tone="tape">🗂️ {plural(player.caseCredits, 'extra case')}</Pill>
+        <Pill>⚖️ {plural(player.items.subpoena, 'Subpoena')}</Pill>
+        <Pill>🧭 {plural(player.items.trace, 'Trace')}</Pill>
+        <Pill>💡 {plural(player.items.hint, 'Hint')}</Pill>
         {player.progress.streakDays > 0 && <Pill tone="tape">🔥 {player.progress.streakDays}</Pill>}
         <button onClick={() => go({ name: 'profile' })} className="ml-auto font-display text-sm font-bold tracking-widest text-paper uppercase underline underline-offset-4">
           Profile

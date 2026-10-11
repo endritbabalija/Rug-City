@@ -2,11 +2,14 @@
 
 import type { PhaseProps } from '../Room'
 import { SuspectCard } from '../evidence/SuspectCard'
-import { Button, Label, Stamp } from '../ui'
+import { Button, Countdown, Label, Stamp, useClock } from '../ui'
 
-export function Briefing({ room, run, busy }: PhaseProps) {
+export function Briefing({ room, run, busy, now }: PhaseProps) {
   const c = room.case
   const readyCount = room.players.filter((p) => p.ready).length
+  const at = useClock(now)
+  const graceOver = room.briefingGraceEndsAt !== null && at >= room.briefingGraceEndsAt
+  const canStart = room.me.isHost || graceOver
 
   return (
     <div className="pb-28">
@@ -55,22 +58,30 @@ export function Briefing({ room, run, busy }: PhaseProps) {
 
       <div className="safe-bottom fixed inset-x-0 bottom-0 z-30 border-t border-line bg-ink/95 px-5 pt-3 pb-3 backdrop-blur">
         <div className="mx-auto max-w-xl">
-          <div className="mb-2 flex justify-between font-mono text-xs text-dim">
-            <span>
-              {readyCount}/{room.players.length} ready
-            </span>
-            <span>{room.players.filter((p) => !p.ready).map((p) => p.name).join(', ') || 'Everyone is in'}</span>
-          </div>
-          <div className="flex gap-2">
-            <Button className="flex-1" disabled={room.me.ready} busy={busy === 'ready'} onClick={() => run({ type: 'ready' })}>
-              {room.me.ready ? 'Waiting for crew…' : "I've read it"}
+          {room.mode === 'solo' ? (
+            <Button className="w-full" busy={busy === 'ready'} onClick={() => run({ type: 'ready' })}>
+              Start investigating
             </Button>
-            {room.me.isHost && (
-              <Button variant="ghost" busy={busy === 'skip'} onClick={() => run({ type: 'skip' })}>
-                Start now
-              </Button>
-            )}
-          </div>
+          ) : (
+            <>
+              <div className="mb-2 flex items-center justify-between gap-3 font-mono text-xs text-dim">
+                <span>
+                  {readyCount}/{room.players.length} ready · {room.players.filter((p) => !p.ready).map((p) => p.name).join(', ') || 'everyone is in'}
+                </span>
+                {room.briefingGraceEndsAt && !room.me.isHost && !graceOver && <Countdown endsAt={room.briefingGraceEndsAt} now={now} label="anyone starts in" />}
+              </div>
+              <div className="flex gap-2">
+                <Button className="flex-1" disabled={room.me.ready} busy={busy === 'ready'} onClick={() => run({ type: 'ready' })}>
+                  {room.me.ready ? 'Waiting for crew…' : "I've read it"}
+                </Button>
+                {canStart && (
+                  <Button variant="ghost" busy={busy === 'skip'} onClick={() => run({ type: 'skip' })}>
+                    Start now
+                  </Button>
+                )}
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

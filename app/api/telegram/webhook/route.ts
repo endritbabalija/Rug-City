@@ -47,7 +47,7 @@ async function handleCommand(msg: Message) {
       }
       return reply(
         chatId,
-        "🕵️ Who Rugged?\n\nA crypto project just got rugged. You and 2–5 friends have about 20 minutes to work out who did it, why, and where the money went.\n\nAdd me to your group chat and send /play, or open the game below.",
+        "🕵️ Who Rugged?\n\nA crypto project just got rugged. Work out who did it, why, and where the money went: solo with Detective Dex, or with 2–5 friends.\n\nAdd me to your group chat and send /play, or open the game below.",
         { reply_markup: openButton('Open Who Rugged?') },
       )
     }

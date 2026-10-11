@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { mooncat } from '@/lib/cases/mooncat'
 import * as engine from '@/lib/game/engine'
 import { GameError } from '@/lib/game/engine'
-import { ACCUSE_GRACE_MS, INVESTIGATE_MS, QUESTIONS_PER_PLAYER, type RoomState } from '@/lib/game/types'
+import { ACCUSE_GRACE_MS, BRIEFING_GRACE_MS, DEX_ID, INVESTIGATE_MS, QUESTIONS_PER_PLAYER, type RoomState } from '@/lib/game/types'
 import { NO_HELP } from '@/lib/game/scoring'
 import { buildView } from '@/lib/game/view'
 
@@ -68,6 +68,16 @@ describe('briefing', () => {
     expect(s.phase).toBe('investigate')
     expect(s.investigateStartedAt).toBe(T0 + 5)
   })
+
+  it('lets the host start any time, and anyone once the briefing grace is over', () => {
+    let s = engine.createRoom('ABCDE', mooncat, people[0], T0)
+    s = engine.join(engine.join(s, people[1], T0), people[2], T0)
+    s = engine.start(s, 1, T0)
+    expect(code(() => engine.skipBriefing(s, 2, T0 + BRIEFING_GRACE_MS - 1))).toBe('HOST_ONLY')
+    expect(code(() => engine.skipBriefing(s, 99, T0 + BRIEFING_GRACE_MS))).toBe('NOT_IN_ROOM')
+    expect(engine.skipBriefing(s, 2, T0 + BRIEFING_GRACE_MS).phase).toBe('investigate')
+    expect(engine.skipBriefing(s, 1, T0 + 1).phase).toBe('investigate')
+  })
 })
 
 describe('investigation', () => {
@@ -118,6 +128,13 @@ describe('investigation', () => {
     expect(code(() => engine.revealHint(s, mooncat, 3, T0))).toBe('NO_MORE_HINTS')
   })
 
+  it('deals suspects to humans only, so Dex never holds one', () => {
+    const solo = engine.createSoloRoom('SOLO1', mooncat, people[0], T0)
+    expect(engine.suspectsFor(solo, mooncat, 1)).toEqual(mooncat.suspects.map((x) => x.id))
+    expect(engine.suspectsFor(solo, mooncat, DEX_ID)).toEqual([])
+    expect(engine.dealSuspects(mooncat, 2).flat().sort()).toEqual(mooncat.suspects.map((x) => x.id).sort())
+  })
+
   it('lets only the host call the vote early, anyone in overtime', () => {
     const s = investigating()
     expect(code(() => engine.callVote(s, 2, T0 + 2000))).toBe('HOST_ONLY')
@@ -149,6 +166,14 @@ describe('accusation and scoring', () => {
     s = engine.closeVote(s, mooncat, 1, T0 + 60_000)
     expect(s.result!.group.culprit).toBe('gary')
     expect(s.result!.score).toBe(0)
+  })
+
+  it('lets the host close the vote with votes missing; non-voters still count toward nothing', () => {
+    let s = engine.callVote(investigating(), 1, T0)
+    s = engine.castVote(s, mooncat, 1, right, T0)
+    s = engine.closeVote(s, mooncat, 1, T0 + 1000)
+    expect(s.phase).toBe('reveal')
+    expect(Object.keys(s.votes)).toEqual(['1'])
   })
 
   it('only lets the host close the vote early', () => {

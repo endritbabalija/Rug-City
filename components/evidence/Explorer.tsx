@@ -4,17 +4,20 @@ import { useState } from 'react'
 import type { ExplorerWallet } from '@/lib/game/view'
 import { useGame } from '../GameContext'
 import type { PhaseProps } from '../Room'
-import { Button, Label, Sheet } from '../ui'
+import { Button, Confirm, Label, Sheet } from '../ui'
+import { helpCost } from './helpCost'
 
 export function Explorer({ room, run, busy }: PhaseProps) {
   const { player, buy } = useGame()
   const { wallets, txs } = room.explorer
   const [openId, setOpenId] = useState<string | null>(null)
+  const [confirming, setConfirming] = useState<string | null>(null)
   const byId = new Map(wallets.map((w) => [w.id, w]))
   const open = openId ? byId.get(openId) : null
   const name = (id: string) => byId.get(id)?.label ?? id
 
   async function trace(w: ExplorerWallet) {
+    setConfirming(null)
     if (player.items.trace <= 0 && !(await buy('trace'))) return
     await run({ type: 'trace', walletId: w.id }, `trace:${w.id}`)
   }
@@ -74,10 +77,20 @@ export function Explorer({ room, run, busy }: PhaseProps) {
             ) : (
               <div className="mt-2">
                 <div className="redacted h-6 w-full">hidden</div>
-                <Button className="mt-3 w-full" busy={busy === `trace:${open.id}`} onClick={() => trace(open)}>
-                  🧭 Trace it {player.items.trace > 0 ? `(${player.items.trace} left)` : '· ⭐15'}
-                </Button>
-                <p className="mt-2 text-xs text-dim">Reveals the source to your whole crew. A teammate&apos;s clue might reveal it too.</p>
+                {confirming === open.id ? (
+                  <div className="mt-3">
+                    <Confirm yes="Trace it" busy={busy === `trace:${open.id}`} onYes={() => trace(open)} onNo={() => setConfirming(null)}>
+                      {helpCost('trace', { owned: player.items.trace, crew: room.mode === 'crew' })}
+                    </Confirm>
+                  </div>
+                ) : (
+                  <Button className="mt-3 w-full" busy={busy === `trace:${open.id}`} onClick={() => setConfirming(open.id)}>
+                    🧭 Trace it {player.items.trace > 0 ? `(${player.items.trace} left)` : '· ⭐15'}
+                  </Button>
+                )}
+                <p className="mt-2 text-xs text-dim">
+                  {room.mode === 'solo' ? "Reveals the source. One of Dex's clues might reveal it too." : "Reveals the source to your whole crew. A teammate's clue might reveal it too."}
+                </p>
               </div>
             )}
 

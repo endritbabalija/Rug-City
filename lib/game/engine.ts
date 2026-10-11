@@ -5,6 +5,7 @@ import type { CaseFile } from '../cases/types'
 import { caseScore, NO_HELP } from './scoring'
 import {
   ACCUSE_GRACE_MS,
+  BRIEFING_GRACE_MS,
   DEX_ID,
   INVESTIGATE_MS,
   MAX_PLAYERS,
@@ -75,12 +76,15 @@ export function dealClues(c: CaseFile, seatCount: number): string[][] {
   return hands
 }
 
-/** Each seat gets one or two suspects who DM them; suspects wrap if seats outnumber them. */
-export function dealSuspects(c: CaseFile, seatCount: number): string[][] {
-  const hands: string[][] = Array.from({ length: seatCount }, () => [])
-  const total = Math.max(c.suspects.length, seatCount)
+/**
+ * Suspects are dealt over the human seats only (Dex never interrogates), so every suspect
+ * talks to someone. Each human gets one or more; suspects wrap if humans outnumber them.
+ */
+export function dealSuspects(c: CaseFile, humanCount: number): string[][] {
+  const hands: string[][] = Array.from({ length: humanCount }, () => [])
+  const total = Math.max(c.suspects.length, humanCount)
   for (let i = 0; i < total; i++) {
-    const hand = hands[i % seatCount]
+    const hand = hands[i % humanCount]
     const suspect = c.suspects[i % c.suspects.length].id
     if (!hand.includes(suspect)) hand.push(suspect)
   }
@@ -91,14 +95,18 @@ export function seatOf(state: RoomState, playerId: number) {
   return state.seats.indexOf(playerId)
 }
 
+/** Seats held by players, without Dex. */
+export const humanSeats = (state: RoomState) => state.seats.filter((id) => id !== DEX_ID)
+
 export function cluesFor(state: RoomState, c: CaseFile, playerId: number): string[] {
   const seat = seatOf(state, playerId)
   return seat < 0 ? [] : dealClues(c, state.seats.length)[seat]
 }
 
 export function suspectsFor(state: RoomState, c: CaseFile, playerId: number): string[] {
-  const seat = seatOf(state, playerId)
-  return seat < 0 ? [] : dealSuspects(c, state.seats.length)[seat]
+  const humans = humanSeats(state)
+  const seat = humans.indexOf(playerId)
+  return seat < 0 ? [] : dealSuspects(c, humans.length)[seat]
 }
 
 // ── Lobby ──────────────────────────────────────────────────────────────────
@@ -190,9 +198,12 @@ export function ready(state: RoomState, actorId: number, now: number): RoomState
   return players.every((p) => p.ready) ? beginInvestigation(next, now) : next
 }
 
+/** The host can start the investigation any time; after BRIEFING_GRACE_MS, so can anyone in the case. */
 export function skipBriefing(state: RoomState, actorId: number, now: number): RoomState {
+  requireMember(state, actorId)
   requirePhase(state, 'briefing')
-  if (actorId !== state.hostId) fail('HOST_ONLY', 'Only the host can skip ahead.', 403)
+  const grace = now - state.phaseStartedAt >= BRIEFING_GRACE_MS
+  if (actorId !== state.hostId && !grace) fail('HOST_ONLY', 'Only the host can start early. Anyone can once the briefing timer runs out.', 403)
   return beginInvestigation(state, now)
 }
 

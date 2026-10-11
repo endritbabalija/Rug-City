@@ -60,7 +60,7 @@ export function hasFreeCase(p: Player, now: number) {
 export function consumeCase(p: Player, now: number): Player {
   if (hasFreeCase(p, now)) return { ...p, freeCaseDay: utcDay(now) }
   if (p.caseCredits > 0) return { ...p, caseCredits: p.caseCredits - 1 }
-  throw new GameError('NO_CASES', "You've used today's free case. Grab a case pack to host another.", 402)
+  throw new GameError('NO_CASES', "You've used today's free case. Get a case pack to play more.", 402)
 }
 
 export function spendItem(p: Player, item: ItemKey): Player {
