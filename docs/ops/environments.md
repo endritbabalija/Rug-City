@@ -72,11 +72,11 @@ Apply a branch's migration when you start testing it (it only adds, so the code 
 - **SQL editor:** Supabase dashboard → SQL Editor → paste the file → Run.
 - **Supabase CLI:** `supabase link --project-ref <ref>` then `supabase db push`.
 
-Applied so far: `0001`–`0009` (`0009_investigation_runs` applied 2026-10-12 for The Refund preview). Most of their tables belong to the crew game removed on 2026-10-11 (`rooms`, `purchases`, `case_results`, `room_chats`, `cases`, …); the code now uses only `players`, `events` and `feature_flags`. Dropping the rest is a separate, deliberate migration. Update this line when you apply one.
+Applied so far: `0001`–`0010` (checked 2026-10-12). `0010_drop_crew_game` removed the crew game's tables and old `players` columns; the database now holds only what the code uses: `players`, `events`, `feature_flags` and `investigation_runs`. Update this line when you apply one.
 
 ## Feature flags
 
-New player-facing features ship off and are checked with `flag('<name>')` (`lib/flags.ts`). The list of flags is the `FlagName` type in `lib/flags.ts`. The table still has rows for the removed crew game (`solo`, `dex_crew`); nothing reads them. A missing row means off. Each server instance caches the table for 30 s, so a change takes up to 30 s to apply.
+New player-facing features ship off and are checked with `flag('<name>')` (`lib/flags.ts`). The list of flags is the `FlagName` type in `lib/flags.ts`. A missing row means off. Each server instance caches the table for 30 s, so a change takes up to 30 s to apply.
 
 ```sql
 -- Turn a flag on

@@ -3,8 +3,6 @@ import type { Run, RunProgress } from '../investigation/types'
 import type { Player } from '../player'
 import { CONFLICT, withRetries, type Store } from './types'
 
-// The `players` table still has columns from the earlier game (credits, items, points…).
-// They all have defaults, so this store reads and writes only the columns below.
 interface PlayerRow {
   id: number
   name: string | null

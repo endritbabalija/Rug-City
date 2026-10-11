@@ -12,7 +12,7 @@ if (!url || !service || !anon) {
 
 let ok = true
 const admin = createClient(url, service, { auth: { persistSession: false } })
-for (const table of ['players', 'events', 'feature_flags']) {
+for (const table of ['players', 'events', 'feature_flags', 'investigation_runs']) {
   const { error } = await admin.from(table).select('*', { head: true, count: 'exact' })
   if (error) {
     ok = false

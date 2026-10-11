@@ -2,15 +2,16 @@
 // so t.me/WhoRuggedBot/preview opens that branch. Needs the Vercel CLI, logged in and linked.
 // Usage: npm run preview:point -- phase1/04-dex-crew   (defaults to the current git branch)
 
-import { execFileSync } from 'node:child_process'
+import { execFileSync, execSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 
 const PREVIEW_HOST = 'who-rugged-preview.vercel.app'
 
-// Windows runs `vercel` through cmd, which splits unquoted arguments at `&`.
+// Windows runs `vercel` (a .cmd shim) through cmd, which splits unquoted arguments at `&`,
+// so there we build one quoted command line ourselves instead of passing args with `shell`.
 const win = process.platform === 'win32'
-const run = (cmd, args) =>
-  execFileSync(cmd, win ? args.map((a) => `"${a}"`) : args, { encoding: 'utf8', shell: win, maxBuffer: 64 << 20, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, MSYS_NO_PATHCONV: '1' } })
+const opts = { encoding: 'utf8', maxBuffer: 64 << 20, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, MSYS_NO_PATHCONV: '1' } }
+const run = (cmd, args) => (win ? execSync([cmd, ...args.map((a) => `"${a}"`)].join(' '), opts) : execFileSync(cmd, args, opts))
 
 const branch = process.argv[2] || run('git', ['rev-parse', '--abbrev-ref', 'HEAD']).trim()
 const { projectId, orgId } = JSON.parse(readFileSync('.vercel/project.json', 'utf8'))
