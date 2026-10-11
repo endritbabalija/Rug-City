@@ -24,6 +24,14 @@ export interface SeasonRating {
   updatedAt: number
 }
 
+/** One product event (`lib/analytics.ts`). */
+export interface AppEvent {
+  name: string
+  playerId: number | null
+  props: Record<string, unknown>
+  at: number
+}
+
 export interface Store {
   getPlayer(id: number): Promise<Player | null>
   /** Inserts the player unless one with the same id exists; returns whichever is stored. */
@@ -51,6 +59,10 @@ export interface Store {
   getSeasonLeaderboard(season: number, limit: number, offset?: number): Promise<{ rows: SeasonRating[]; total: number }>
   /** 1-based position of a player in a season, or null if they aren't ranked. */
   getSeasonPosition(season: number, playerId: number): Promise<number | null>
+
+  trackEvents(events: AppEvent[]): Promise<void>
+  /** Every row of the feature flag table, by name. */
+  getFlags(): Promise<Record<string, boolean>>
 }
 
 export class ConflictError extends Error {}

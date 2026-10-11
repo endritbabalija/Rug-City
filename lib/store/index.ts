@@ -15,4 +15,9 @@ export function store(): Store {
   return g.__whoRuggedStore
 }
 
-export type { Store, Purchase } from './types'
+/** Tests only: drop the store so the next `store()` call builds a fresh one. */
+export function resetStore() {
+  delete g.__whoRuggedStore
+}
+
+export type { Store, Purchase, AppEvent } from './types'

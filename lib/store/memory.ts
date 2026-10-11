@@ -3,7 +3,7 @@
 
 import type { RoomState } from '../game/types'
 import type { Player } from '../player'
-import type { Purchase, PurchaseStatus, SeasonRating, Store } from './types'
+import type { AppEvent, Purchase, PurchaseStatus, SeasonRating, Store } from './types'
 
 const clone = <T,>(v: T): T => structuredClone(v)
 
@@ -14,6 +14,8 @@ export function createMemoryStore(): Store {
   const rooms = new Map<string, RoomState>()
   const purchases = new Map<string, Purchase>()
   const ratings = new Map<string, SeasonRating>()
+  const events: AppEvent[] = []
+  const flags: Record<string, boolean> = {}
   const ranked = (season: number) => [...ratings.values()].filter((r) => r.season === season && r.rating > 0).sort(byStanding)
 
   return {
@@ -82,6 +84,13 @@ export function createMemoryStore(): Store {
     async getSeasonPosition(season, playerId) {
       const i = ranked(season).findIndex((r) => r.playerId === playerId)
       return i < 0 ? null : i + 1
+    },
+
+    async trackEvents(batch) {
+      events.push(...clone(batch))
+    },
+    async getFlags() {
+      return { ...flags }
     },
   }
 }

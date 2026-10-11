@@ -27,13 +27,17 @@ With no Supabase, bot or AI keys, the app uses an in-memory store, grants shop i
 ```bash
 npm test          # engine rules, case solvability, init-data, payments, room flow
 npm run typecheck
+npm run lint
 ```
+
+Set `FLAGS=solo,daily` to turn feature flags on locally. CI (`.github/workflows/ci.yml`) runs typecheck, lint, tests and build on every push and PR. Local, staging and production setup: [`docs/ops/environments.md`](./docs/ops/environments.md).
 
 ## Deploy
 
-1. **Supabase**: create a project and run `supabase/migrations/0001_init.sql`. Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY`.
+1. **Supabase**: create a project and run every file in `supabase/migrations/` in order. Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY`.
 2. **Bot**: create it in @BotFather, then `/newapp` to register the Mini App and pick a short name. Set `TELEGRAM_BOT_TOKEN`, `NEXT_PUBLIC_BOT_USERNAME`, `NEXT_PUBLIC_APP_SHORT_NAME`, a random `TELEGRAM_WEBHOOK_SECRET`, and `ADMIN_TELEGRAM_IDS` (who may `/refund`).
 3. **AI**: set `ANTHROPIC_API_KEY` (optional; scripted replies without it). `SUSPECT_MODEL` defaults to `claude-haiku-5-5`.
+   **Errors**: set `SENTRY_DSN` and `NEXT_PUBLIC_SENTRY_DSN` (optional; Sentry is off without them).
 4. Deploy to Vercel with those env vars, set `APP_URL` to the deployment URL, then run:
    ```bash
    npm run bot:setup   # reads TELEGRAM_BOT_TOKEN, TELEGRAM_WEBHOOK_SECRET and APP_URL from .env.local

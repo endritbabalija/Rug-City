@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { track } from '@/lib/analytics'
 import { caseSummaries } from '@/lib/cases'
 import { badgeInfo, BADGES, SKUS } from '@/lib/catalog'
 import { GameError } from '@/lib/game/engine'
@@ -9,6 +10,7 @@ import { store } from '@/lib/store'
 
 export const GET = route(async (req) => {
   const { player, init } = await authenticate(req)
+  track('app_open', player.id, { startParam: init?.startParam ?? null })
   return NextResponse.json({
     player: publicPlayer(player),
     startParam: init?.startParam ?? null,

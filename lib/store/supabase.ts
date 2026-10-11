@@ -169,6 +169,19 @@ export function createSupabaseStore(url: string, serviceKey: string): Store {
       check(ahead)
       return (ahead.count ?? 0) + 1
     },
+
+    async trackEvents(events) {
+      if (!events.length) return
+      check(
+        await db
+          .from('events')
+          .insert(events.map((e) => ({ name: e.name, player_id: e.playerId, props: e.props, at: new Date(e.at).toISOString() }))),
+      )
+    },
+    async getFlags() {
+      const rows = check(await db.from('feature_flags').select('name, enabled')) as { name: string; enabled: boolean }[]
+      return Object.fromEntries(rows.map((r) => [r.name, r.enabled]))
+    },
   }
   return s
 }

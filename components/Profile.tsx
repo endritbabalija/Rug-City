@@ -13,6 +13,7 @@ export function Profile() {
   const { cluePoints, rank, streakDays, season, recent } = player.progress
   const span = rank.next ? rank.next.at - rank.at : 1
   const pct = rank.next ? Math.min(100, Math.round(((cluePoints - rank.at) / span) * 100)) : 100
+  // eslint-disable-next-line react-hooks/purity -- a day-granularity countdown; re-render drift doesn't matter
   const daysLeft = Math.max(0, Math.ceil((season.endsAt - Date.now()) / DAY_MS))
 
   async function equip(badge: string | null) {
@@ -76,7 +77,7 @@ export function Profile() {
           </div>
         </div>
         <p className="mt-3 font-type text-sm leading-snug">
-          Your rating is your best {RATING_BEST_OF} cases this season: your own vote's accuracy plus speed. Cases where your crew used a power-up don't count.
+          Your rating is your best {RATING_BEST_OF} cases this season: your own vote&apos;s accuracy plus speed. Cases where your crew used a power-up don&apos;t count.
         </p>
         <Button variant="ghost" className="mt-4 w-full" onClick={() => go({ name: 'leaderboard' })}>
           Season leaderboard
@@ -144,7 +145,7 @@ export function Profile() {
             Only your first time through a case counts, with a crew of {RATED_MIN_SEATS} or more, up to {RATED_PER_DAY} cases a day.
           </li>
         </ul>
-        <p className="mt-4 text-xs text-dim">Clue Points and ratings are bragging rights. They can't be bought, have no cash value and never turn into a token.</p>
+        <p className="mt-4 text-xs text-dim">Clue Points and ratings are bragging rights. They can&apos;t be bought, have no cash value and never turn into a token.</p>
       </section>
     </div>
   )

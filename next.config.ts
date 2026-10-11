@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { withSentryConfig } from '@sentry/nextjs/config'
 import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
@@ -7,4 +8,4 @@ const nextConfig: NextConfig = {
   turbopack: { root: path.resolve('.') },
 }
 
-export default nextConfig
+export default withSentryConfig(nextConfig, { silent: !process.env.CI })

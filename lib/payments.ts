@@ -1,5 +1,6 @@
 import 'server-only'
 import { randomUUID } from 'node:crypto'
+import { track } from './analytics'
 import { getSku } from './catalog'
 import { env } from './env'
 import { GameError } from './game/engine'
@@ -78,6 +79,7 @@ export async function handleSuccessfulPayment(fromId: number, pay: SuccessfulPay
     await store().transitionPurchase(purchase.id, 'paid', 'pending')
     throw err
   }
+  track('purchase', purchase.userId, { sku: sku.id, stars: purchase.stars })
   return sku
 }
 
