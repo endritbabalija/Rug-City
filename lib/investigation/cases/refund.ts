@@ -257,7 +257,7 @@ export const THE_REFUND_V1: CaseDefinition = {
       text: 'Lena personally controlled the receiving account.',
       visible: { evidence: ['E06'] },
       // E02 + E07 is not in the brief's table: it is the same direct destination match as E08 + E07
-      // (both show RELAY-72 receiving or sending the money). Flagged for Endrit in docs/architecture.md.
+      // (both show RELAY-72 receiving or sending the money). Kept by Endrit on 2026-10-12.
       support: [
         ['E06', 'E07'],
         ['E08', 'E07'],
