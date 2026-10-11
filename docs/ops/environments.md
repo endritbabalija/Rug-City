@@ -1,6 +1,6 @@
 # Environments
 
-One codebase, one Supabase project. Background: `Architecture.md`, decision G.
+One codebase, one Supabase project. Background (archived): `docs/archive/Architecture.md`, decision G.
 
 While there are no real players, preview deploys and production share the **same Supabase project**. A second (staging) project is added only once real players are in and a risky change needs a safe place to test.
 
@@ -20,7 +20,7 @@ Every variable is listed in `.env.example`.
 - **Migrations only add.** New tables, new nullable or defaulted columns, new indexes, new functions. Never drop, rename or change the meaning of anything the code on `main` still uses. A removal waits until the code that used it has been on `main` for one release, then ships as its own migration.
 - **Flags are shared.** Turning a flag on affects previews and production together. While there are no real players that's fine; afterwards, test with `FLAGS` locally first.
 - **Back up before data scripts.** Before a backfill or any script that rewrites rows, take a backup (Supabase → Database → Backups, or export the tables).
-- **Wipe test data at launch.** Before the Rug City launch, clear test players, rooms, results and events (see `docs/phase-1/11-launch.md`).
+- **Wipe test data at launch.** Before the first public launch, clear test players, rooms, results, runs and events.
 
 ## Region
 
@@ -53,7 +53,7 @@ The production bot has two Mini Apps. `Play` opens production; `preview` opens t
 **Checking a branch:**
 1. Apply its new migration (below) and push the branch.
 2. When Vercel's Preview deploy is ready: `npm run preview:point -- <branch>` (defaults to the current branch).
-3. Turn on the slice's flag in `feature_flags`.
+3. Turn on the feature's flag in `feature_flags`.
 4. Open `t.me/WhoRuggedBot/preview` in Telegram and play it. Crew friends join with the case code or a preview invite link.
 
 **Careful:** previews run as the real bot on the shared database. A Stars purchase made in a preview is real and is paid to the production webhook.
@@ -67,21 +67,21 @@ The production bot has two Mini Apps. `Play` opens production; `preview` opens t
 
 Files in `supabase/migrations/`, numbered `000N_<name>.sql`, applied in order, never edited after merge. Each is written to be safe to run twice (`create … if not exists`) and, under the rules above, only adds.
 
-Apply a slice's migration when you start testing its branch (it only adds, so the code on `main` keeps working). Either:
+Apply a branch's migration when you start testing it (it only adds, so the code on `main` keeps working). Either:
 
 - **SQL editor:** Supabase dashboard → SQL Editor → paste the file → Run.
 - **Supabase CLI:** `supabase link --project-ref <ref>` then `supabase db push`.
 
-Applied so far: `0001`–`0006` (`scripts/backfill-v2.mjs` was run after `0004`). Update this line when you apply one.
+Applied so far: `0001`–`0008` (checked 2026-10-11; `scripts/backfill-v2.mjs` was run after `0004`). Update this line when you apply one.
 
 ## Feature flags
 
-New player-facing features ship off and are checked with `flag('<name>')` (`lib/flags.ts`). The list of flags is in `docs/phase-1/DEFAULTS.md`. A missing row means off. Each server instance caches the table for 30 s, so a change takes up to 30 s to apply.
+New player-facing features ship off and are checked with `flag('<name>')` (`lib/flags.ts`). The list of flags is the `FlagName` type in `lib/flags.ts`; currently `solo` and `dex_crew` are on (legacy features). A missing row means off. Each server instance caches the table for 30 s, so a change takes up to 30 s to apply.
 
 ```sql
 -- Turn a flag on
 insert into feature_flags (name, enabled, note, updated_at)
-values ('solo', true, 'testing slice 3', now())
+values ('solo', true, 'testing solo', now())
 on conflict (name) do update set enabled = excluded.enabled, note = excluded.note, updated_at = now();
 
 -- Turn it off

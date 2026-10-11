@@ -1,4 +1,4 @@
-// Model calls for the case pipeline (docs/phase-1/06-case-pipeline.md): drafting a case
+// Model calls for the case pipeline (docs/archive/phase-1/06-case-pipeline.md): drafting a case
 // and the blind solver. Script-only: imports nothing marked 'server-only'.
 
 import Anthropic from '@anthropic-ai/sdk'

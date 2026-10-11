@@ -1,8 +1,8 @@
-# Who Rugged?
+# Rug City
 
-A group-chat detective game as a Telegram Mini App. A fictional crypto project gets rugged and a crew of 3–6 friends has about 20 minutes to work out **who did it, why, and where the money went**. Concept: [`Who Rugged — Concept.md`](./Who%20Rugged%20—%20Concept.md).
+A detective adventure as a Telegram Mini App: uncover the human choices behind fictional crypto scandals, and explain what happened with evidence. Where the game is going: [`Rug City — Game Direction.md`](./Rug%20City%20—%20Game%20Direction.md).
 
-This is the first version from the concept doc: the three launch cases, the full case loop, Stars purchases, verdict sharing. Bounty Cases, TON payouts, ads, the season pass and solo mode are out of scope until the go/no-go checks.
+The code below is the earlier version (formerly *Who Rugged?*): a crew case loop with votes, Stars purchases, districts, ranks and an AI case pipeline. The rest of this README describes that code as it is. Old design docs and build briefs are in [`docs/archive/`](./docs/archive/); coding rules are in [`docs/CONVENTIONS.md`](./docs/CONVENTIONS.md).
 
 ## Stack
 
@@ -46,7 +46,7 @@ Set `FLAGS=solo,daily` to turn feature flags on locally. CI (`.github/workflows/
 
 ## New cases
 
-Cases live in the `cases` table; the three in `lib/cases/*.ts` are built in. New ones are drafted by a model, checked by a blind solver, and released by an admin (docs/phase-1/06-case-pipeline.md). Both scripts read `.env.local` and need `ANTHROPIC_API_KEY` and the Supabase keys.
+Cases live in the `cases` table; the three in `lib/cases/*.ts` are built in. New ones are drafted by a model, checked by a blind solver, and released by an admin (docs/archive/phase-1/06-case-pipeline.md). Both scripts read `.env.local` and need `ANTHROPIC_API_KEY` and the Supabase keys.
 
 ```bash
 npm run cases:draft -- --district memecoin-swamp --count 4   # draft, check, store passing ones as 'review'
@@ -66,7 +66,9 @@ Each case is a draft plus about 40 solver calls, and up to 2 revisions when the 
 | Group play | `components/phases/Lobby.tsx`, webhook `/play` | Invites are direct Mini App links (`t.me/<bot>/<app>?startapp=<code>`) that work in groups; opening one auto-joins the lobby. |
 | Native chrome | `lib/telegram/webapp.ts` | BackButton, haptics, closing confirmation mid-case, vertical swipes off, header and background colors set. |
 
-## Game design notes
+## Legacy game design notes
+
+How the earlier crew game works. The Refund is built separately (see `Rug City — The Refund Brief.md`).
 
 - **Cases are data** (`lib/cases/*.ts`) and stay on the server. Players only ever receive their own projection (`lib/game/view.ts`): their clues, their suspect chats, and shared explorer data. Hidden funding sources stay masked until someone uses Trace.
 - **Clue split**: clues are dealt round-robin in each case's `dealOrder`. `tests/cases.test.ts` checks, for 3, 4, 5 and 6 players, that no single player ever holds a complete proof of the culprit. It's a static stand-in for the doc's blind-solver gate.
