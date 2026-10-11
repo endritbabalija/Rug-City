@@ -26,7 +26,8 @@ export function Reveal({ room, now }: PhaseProps) {
   const c = room.case
   const caught = r.correct.culprit
   const minutes = Math.max(1, Math.round(r.elapsedSec / 60))
-  const headline = caught ? `Our crew caught the rugger in ${minutes} min` : 'The rugger got away'
+  const team = room.mode === 'solo' ? 'Dex and I' : 'Our crew'
+  const headline = caught ? `${team} caught the rugger in ${minutes} min` : 'The rugger got away'
   const appLink = inviteLink('').replace(/\?(startapp|room)=$/, '')
   const before = r.points.culprit + r.points.motive + r.points.trail + r.points.time
   const helpLines = (Object.keys(HELP_LABEL) as (keyof Help)[])

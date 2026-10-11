@@ -1,7 +1,19 @@
 import type { CaseFile, Clue, Option, Tx, Wallet } from '../cases/types'
-import { chatKey, cluesFor, countCorrect, questionsLeft, suspectsFor } from './engine'
+import { dexHand, dexHintsLeft, hasDex } from './dex'
+import { chatKey, cluesFor, countCorrect, questionsLeft, roomMode, suspectsFor } from './engine'
 import { NO_HELP } from './scoring'
-import { ACCUSE_GRACE_MS, INVESTIGATE_MS, type Award, type ChatMessage, type FeedItem, type Phase, type RoomResult, type Vote } from './types'
+import {
+  ACCUSE_GRACE_MS,
+  INVESTIGATE_MS,
+  type Award,
+  type CaseMode,
+  type ChatMessage,
+  type DexMessage,
+  type FeedItem,
+  type Phase,
+  type RoomResult,
+  type Vote,
+} from './types'
 import type { RoomState } from './types'
 
 export interface PublicSuspect {
@@ -19,8 +31,12 @@ export interface ExplorerWallet extends Omit<Wallet, 'fundedBy' | 'fundingHidden
   traceable: boolean
 }
 
+/** Dex's opener, shown before anything he has said in the room. */
+export const DEX_OPENER = "Dex here. I've got my own pile of evidence on this one. Ask and I'll show you, one piece at a time."
+
 export interface RoomView {
   code: string
+  mode: CaseMode
   phase: Phase
   phaseStartedAt: number
   serverNow: number
@@ -51,6 +67,8 @@ export interface RoomView {
   feed: FeedItem[]
   myVote: Vote | null
   votesIn: number
+  /** Dex's corner in rooms where he has a seat: everything he has shared with the player. */
+  dex: { shared: Clue[]; messages: (Pick<DexMessage, 'text' | 'at' | 'hint'> & { clue?: Clue })[]; cluesLeft: number; hintsLeft: number } | null
   result:
     | (RoomResult & {
         answer: Vote
@@ -63,6 +81,8 @@ export interface RoomView {
       })
     | null
 }
+
+const clueOf = (c: CaseFile, id: string) => c.clues.find((cl) => cl.id === id)!
 
 /** `chats` is this player's `room_chats` messages in this room, by suspect id. */
 export function buildView(state: RoomState, c: CaseFile, playerId: number, now: number, chats: Record<string, ChatMessage[]>): RoomView {
@@ -86,6 +106,7 @@ export function buildView(state: RoomState, c: CaseFile, playerId: number, now: 
 
   return {
     code: state.code,
+    mode: roomMode(state),
     phase: state.phase,
     phaseStartedAt: state.phaseStartedAt,
     serverNow: now,
@@ -107,7 +128,7 @@ export function buildView(state: RoomState, c: CaseFile, playerId: number, now: 
       trails: c.trails,
       hintCount: c.hints.length,
     },
-    myClues: myClueIds.map((id) => c.clues.find((cl) => cl.id === id)!),
+    myClues: myClueIds.map((id) => clueOf(c, id)),
     mySuspects,
     chats: threads,
     questionsLeft: questionsLeft(state, playerId),
@@ -116,6 +137,18 @@ export function buildView(state: RoomState, c: CaseFile, playerId: number, now: 
     feed: state.feed,
     myVote: state.votes[String(playerId)] ?? null,
     votesIn: Object.keys(state.votes).length,
+    dex:
+      hasDex(state) && inCase
+        ? {
+            shared: (state.dexShared ?? []).map((id) => clueOf(c, id)),
+            messages: [
+              { text: DEX_OPENER, at: state.investigateStartedAt ?? state.phaseStartedAt },
+              ...(state.dexMessages ?? []).map(({ text, at, clueId, hint }) => ({ text, at, hint, clue: clueId ? clueOf(c, clueId) : undefined })),
+            ],
+            cluesLeft: dexHand(state, c).length - (state.dexShared ?? []).length,
+            hintsLeft: dexHintsLeft(state, c),
+          }
+        : null,
     result:
       revealed && state.result
         ? {

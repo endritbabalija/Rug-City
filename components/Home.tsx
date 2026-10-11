@@ -10,10 +10,10 @@ export function Home() {
   const [busy, setBusy] = useState<string | null>(null)
   const [code, setCode] = useState('')
 
-  async function host(caseId: string) {
-    setBusy(caseId)
+  async function open(caseId: string, solo: boolean) {
+    setBusy(`${caseId}:${solo ? 'solo' : 'crew'}`)
     try {
-      const res = await api<{ code: string }>('/api/rooms', { caseId })
+      const res = await api<{ code: string }>(solo ? '/api/solo' : '/api/rooms', { caseId })
       go({ name: 'room', code: res.code })
     } catch (e) {
       toast(e instanceof ApiError ? e.message : 'Could not open the case.', 'error')
@@ -85,9 +85,14 @@ export function Home() {
             <h2 className="mt-2 font-display text-[2.1rem] leading-none font-black uppercase">{c.title}</h2>
             <p className="mt-1 font-type text-sm font-bold text-rug uppercase">{c.crime}</p>
             <p className="mt-3 font-type text-[15px] leading-snug">{c.tagline}</p>
-            <Button className="mt-4 w-full" busy={busy === c.id} onClick={() => host(c.id)}>
+            <Button className="mt-4 w-full" busy={busy === `${c.id}:crew`} onClick={() => open(c.id, false)}>
               Host this case
             </Button>
+            {flags.solo && (
+              <Button variant="paper" className="mt-2 w-full border border-paper-ink/30" busy={busy === `${c.id}:solo`} onClick={() => open(c.id, true)}>
+                🕵️ Play solo with Dex
+              </Button>
+            )}
           </article>
         ))}
       </section>

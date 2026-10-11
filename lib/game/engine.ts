@@ -5,6 +5,7 @@ import type { CaseFile } from '../cases/types'
 import { caseScore, NO_HELP } from './scoring'
 import {
   ACCUSE_GRACE_MS,
+  DEX_ID,
   INVESTIGATE_MS,
   MAX_PLAYERS,
   MIN_PLAYERS,
@@ -36,11 +37,11 @@ export function isMember(state: RoomState, playerId: number) {
   return state.players.some((p) => p.id === playerId)
 }
 
-function requireMember(state: RoomState, playerId: number) {
+export function requireMember(state: RoomState, playerId: number) {
   if (!isMember(state, playerId)) fail('NOT_IN_ROOM', "You're not in this case.", 403)
 }
 
-function requirePhase(state: RoomState, ...phases: RoomState['phase'][]) {
+export function requirePhase(state: RoomState, ...phases: RoomState['phase'][]) {
   if (!phases.includes(state.phase)) fail('WRONG_PHASE', 'That is not possible right now.', 409)
 }
 
@@ -48,7 +49,7 @@ function setPhase(state: RoomState, phase: RoomState['phase'], now: number): Roo
   return { ...state, phase, phaseStartedAt: now }
 }
 
-function log(state: RoomState, playerId: number, text: string, now: number): RoomState {
+export function log(state: RoomState, playerId: number, text: string, now: number): RoomState {
   return { ...state, feed: [...state.feed, { at: now, playerId, text }].slice(-60) }
 }
 
@@ -59,7 +60,7 @@ function nameOf(state: RoomState, playerId: number) {
 export const roomMode = (state: RoomState): CaseMode => state.mode ?? 'crew'
 export const roomHelp = (state: RoomState): Help => ({ ...NO_HELP, ...state.help })
 
-function addHelp(state: RoomState, kind: keyof Help): RoomState {
+export function addHelp(state: RoomState, kind: keyof Help): RoomState {
   const help = roomHelp(state)
   return { ...state, help: { ...help, [kind]: help[kind] + 1 } }
 }
@@ -126,6 +127,12 @@ export function createRoom(
     feed: [],
     votes: {},
   }
+}
+
+/** A solo case: the player and Dex are seated straight away and the room opens on the briefing. */
+export function createSoloRoom(code: string, c: CaseFile, player: { id: number; name: string; badge?: string }, now: number): RoomState {
+  const room = createRoom(code, c, player, now)
+  return log(setPhase({ ...room, mode: 'solo', seats: [player.id, DEX_ID], dexShared: [], dexMessages: [] }, 'briefing', now), player.id, 'The case file is open.', now)
 }
 
 export function join(state: RoomState, player: { id: number; name: string; badge?: string }, now: number): RoomState {

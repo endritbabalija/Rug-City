@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server'
 import { normalizeCode, viewRoom } from '@/lib/rooms'
-import { authenticate, route } from '@/lib/server'
+import { authenticateId, route } from '@/lib/server'
 
 type Ctx = { params: Promise<{ code: string }> }
 
+// Polled by every open room, so it skips loading the player.
 export const GET = route<Ctx>(async (req, { params }) => {
-  const { player } = await authenticate(req)
+  const id = authenticateId(req)
   const code = normalizeCode((await params).code)
-  return NextResponse.json(await viewRoom(code, player))
+  return NextResponse.json(await viewRoom(code, { id }))
 })

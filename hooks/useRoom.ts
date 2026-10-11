@@ -3,6 +3,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, ApiError } from '@/lib/client/api'
+import { pollMs } from '@/lib/client/sync'
 import type { RoomView } from '@/lib/game/view'
 import type { PublicPlayer } from '@/lib/server'
 
@@ -18,11 +19,10 @@ function realtimeClient() {
   return realtime
 }
 
-const POLL_MS = 4000
-
 export function useRoom(code: string, onPlayer: (p: PublicPlayer) => void) {
   const [room, setRoom] = useState<RoomData | null>(null)
   const [error, setError] = useState<ApiError | null>(null)
+  const [live, setLive] = useState(false)
   const clockOffset = useRef(0)
   const inflight = useRef(false)
 
@@ -63,24 +63,39 @@ export function useRoom(code: string, onPlayer: (p: PublicPlayer) => void) {
     [code, accept],
   )
 
+  const mode = room?.mode
+
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- initial fetch; state is set after the request resolves
     void refresh()
-    const timer = setInterval(() => {
-      if (document.visibilityState === 'visible') void refresh()
-    }, POLL_MS)
     const onVisible = () => document.visibilityState === 'visible' && void refresh()
     document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [refresh])
 
+  // Crew rooms listen for Realtime pushes. Solo rooms only change through this player's own actions.
+  useEffect(() => {
+    if (mode !== 'crew') return
     const rt = realtimeClient()
-    const channel = rt?.channel(`room:${code}`).on('broadcast', { event: 'update' }, () => void refresh()).subscribe()
-
+    const channel = rt
+      ?.channel(`room:${code}`)
+      .on('broadcast', { event: 'update' }, () => void refresh())
+      .subscribe((status) => setLive(status === 'SUBSCRIBED'))
     return () => {
-      clearInterval(timer)
-      document.removeEventListener('visibilitychange', onVisible)
+      setLive(false)
       if (channel) void rt?.removeChannel(channel)
     }
-  }, [code, refresh])
+  }, [code, mode, refresh])
+
+  // Until the first fetch lands (or if it failed), keep retrying like a crew room without Realtime.
+  useEffect(() => {
+    const ms = pollMs(mode ?? 'crew', live)
+    if (ms === null) return
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible') void refresh()
+    }, ms)
+    return () => clearInterval(timer)
+  }, [mode, live, refresh])
 
   const now = useCallback(() => Date.now() + clockOffset.current, [])
 

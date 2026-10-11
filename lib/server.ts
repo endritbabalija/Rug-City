@@ -18,30 +18,35 @@ export interface Session {
   init: InitData | null
 }
 
-/**
- * Every API call carries `Authorization: tma <initData>`. We verify the signature,
- * then load (or create) the player. Never trust initDataUnsafe from the client.
- */
-export async function authenticate(req: Request): Promise<Session> {
+type Profile = { id: number; name: string; username?: string; photoUrl?: string }
+
+/** Verify the request's `Authorization` header and read the Telegram user from it. */
+function readProfile(req: Request): { profile: Profile; init: InitData | null } {
   const header = req.headers.get('authorization') ?? ''
   const [scheme, ...rest] = header.split(' ')
   const value = rest.join(' ')
   const cfg = env()
 
-  let profile: { id: number; name: string; username?: string; photoUrl?: string }
-  let init: InitData | null = null
-
   if (scheme === 'tma' && value) {
-    init = validateInitData(value, cfg.botToken)
-    profile = { id: init.user.id, name: displayName(init.user), username: init.user.username, photoUrl: init.user.photo_url }
-  } else if (scheme === 'dev' && cfg.devAuth) {
+    const init = validateInitData(value, cfg.botToken)
+    const profile = { id: init.user.id, name: displayName(init.user), username: init.user.username, photoUrl: init.user.photo_url }
+    return { profile, init }
+  }
+  if (scheme === 'dev' && cfg.devAuth) {
     const [idRaw, ...nameParts] = value.split(':')
     const id = Number(idRaw)
     if (!Number.isSafeInteger(id) || id <= 0) throw new InitDataError('Bad dev user')
-    profile = { id, name: decodeURIComponent(nameParts.join(':')) || `Dev ${id}` }
-  } else {
-    throw new InitDataError('Open Who Rugged? from Telegram.')
+    return { profile: { id, name: decodeURIComponent(nameParts.join(':')) || `Dev ${id}` }, init: null }
   }
+  throw new InitDataError('Open Who Rugged? from Telegram.')
+}
+
+/**
+ * Every API call carries `Authorization: tma <initData>`. We verify the signature,
+ * then load (or create) the player. Never trust initDataUnsafe from the client.
+ */
+export async function authenticate(req: Request): Promise<Session> {
+  const { profile, init } = readProfile(req)
 
   const db = store()
   let player = await db.getPlayer(profile.id)
@@ -57,6 +62,16 @@ export async function authenticate(req: Request): Promise<Session> {
   // Sentry gives each request its own scope, so this tags only this request's errors.
   Sentry.setTag('player', player.id)
   return { player, init }
+}
+
+/**
+ * The light path for frequent reads (room polling): verifies the init data and returns the
+ * user id, without loading or updating the player.
+ */
+export function authenticateId(req: Request): number {
+  const { id } = readProfile(req).profile
+  Sentry.setTag('player', id)
+  return id
 }
 
 export function errorResponse(err: unknown, tags: Record<string, string> = {}) {

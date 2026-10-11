@@ -8,6 +8,8 @@ export const INVESTIGATE_MS = 12 * 60 * 1000
 export const ACCUSE_GRACE_MS = 3 * 60 * 1000
 /** Live interrogation questions each player gets per case (Subpoena answers are extra). */
 export const QUESTIONS_PER_PLAYER = 6
+/** Detective Dex's seat id. Telegram ids are positive, so it can't collide with a player. */
+export const DEX_ID = 0
 
 export interface RoomPlayer {
   id: number
@@ -22,6 +24,16 @@ export interface ChatMessage {
   text: string
   at: number
   subpoena?: boolean
+}
+
+/** Something Dex said in a solo room: banter around a clue or hint he shared. */
+export interface DexMessage {
+  ask: 'clue' | 'hint'
+  text: string
+  at: number
+  /** The clue he handed over, or the hint he gave, with this line. */
+  clueId?: string
+  hint?: string
 }
 
 export interface FeedItem {
@@ -92,6 +104,9 @@ export interface RoomState {
   subpoenas: Record<string, boolean>
   traced: string[]
   hintsRevealed: number
+  /** Dex's clues he has shown the player, in order (rooms with Dex only). */
+  dexShared?: string[]
+  dexMessages?: DexMessage[]
   /** Missing on rooms created before help penalties. */
   help?: Help
   feed: FeedItem[]

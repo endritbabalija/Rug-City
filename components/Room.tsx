@@ -76,7 +76,9 @@ export function Room({ code }: { code: string }) {
     if (!room) return
     const live = room.phase !== 'lobby' && room.phase !== 'reveal' && room.member
     setClosingConfirmation(live)
-    if (lastPhase.current === 'lobby' && room.phase === 'briefing') setFullscreen(true)
+    // Solo rooms open straight on the briefing.
+    const opened = room.mode === 'solo' ? lastPhase.current === null : lastPhase.current === 'lobby'
+    if (opened && room.phase === 'briefing') setFullscreen(true)
     lastPhase.current = room.phase
   }, [room])
 
