@@ -12,7 +12,7 @@ export class ApiError extends Error {
   }
 }
 
-const DEV_KEY = 'who-rugged:dev-user'
+const DEV_KEY = 'rug-city:dev-user'
 
 /**
  * Outside Telegram (local dev only) each browser tab plays as its own fake user:
@@ -43,16 +43,8 @@ function authHeader() {
   return wa ? `tma ${wa.initData}` : `dev ${devIdentity()}`
 }
 
-/** Room code the app was opened with: Telegram's start_param, or ?room= in the browser. */
-export function launchRoomCode(): string | null {
-  const raw = webApp()?.initDataUnsafe.start_param ?? new URLSearchParams(window.location.search).get('room')
-  return raw && /^[A-Za-z0-9]{5}$/.test(raw) ? raw.toUpperCase() : null
-}
-
 export async function api<T>(path: string, body?: unknown): Promise<T> {
   const headers: Record<string, string> = { Authorization: authHeader() }
-  const start = launchRoomCode()
-  if (start) headers['x-start-param'] = start
   if (body !== undefined) headers['Content-Type'] = 'application/json'
   const res = await fetch(path, { method: body === undefined ? 'GET' : 'POST', headers, body: body === undefined ? undefined : JSON.stringify(body) })
   const json = await res.json().catch(() => ({}))

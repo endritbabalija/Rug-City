@@ -361,13 +361,13 @@ This is an architectural direction, not a demand for a large framework or a comp
 
 ## Preserve useful foundations
 
-Telegram authentication and shell; Next.js/React UI; Supabase and in-memory Store implementations; server-authoritative views; pure rule functions; versioned writes; feature flags; existing test patterns. Payments infrastructure can remain untouched during the free prototype.
+Telegram authentication and shell; Next.js/React UI; Supabase and in-memory Store implementations; server-authoritative views; pure rule functions; versioned writes; feature flags; existing test patterns. The earlier crew game, its payments and progression were removed on 2026-10-11; reintroduce payments only with a later monetisation task.
 
 ## Separate three concepts
 
 1. Case definition: authored truth, evidence, statements, claim support and access conditions. Hidden portions remain server-only.
 2. Investigation run: which evidence and findings have been discovered, current dialogue state and progress, pinned to a content version.
-3. Campaign progress: which chapters a player completed, spoiler/replay status and later narrative choices. Do not infer this solely from legacy Clue Points or a list of started rooms.
+3. Campaign progress: which chapters a player completed, spoiler/replay status and later narrative choices. Do not infer it from a list of started runs alone.
 
 These are conceptual boundaries. In prototype 01 only case definition and single-player run need implementation. Record the campaign boundary in documentation rather than inventing its full persistence now.
 
@@ -385,7 +385,7 @@ For future co-op, room membership determines access to shared evidence. Personal
 
 ## Persistence and completion
 
-Keep content versions stable per run. Restart creates a new run, not a destructive reset of another participant's session. Future campaign completion needs a unique player/chapter entitlement record and idempotent application. Do not route prototype resolution through legacy charges, prizes, rank or referral rewards.
+Keep content versions stable per run. Restart creates a new run, not a destructive reset of another participant's session. Future campaign completion needs a unique player/chapter entitlement record and idempotent application. Do not tie resolution to charges, prizes, ranks or referral rewards.
 
 ## What Claude should produce now
 
@@ -394,7 +394,7 @@ Keep content versions stable per run. Restart creates a new run, not a destructi
 - A concise prototype architecture note distinguishing implemented pieces from future extension points.
 - Actual test/build results and remaining manual checks.
 
-Do not implement co-op, cases 2–5, a campaign service, AI authoring, payment offers or a new roadmap merely because they are described here. Do not migrate or deprecate the legacy engine without an explicit later task.
+Do not implement co-op, cases 2–5, a campaign service, AI authoring, payment offers or a new roadmap merely because they are described here. The legacy engine has already been removed; don't rebuild its systems.
 
 # 10. Product and commercial hypotheses
 

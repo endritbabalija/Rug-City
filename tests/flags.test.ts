@@ -17,29 +17,26 @@ afterEach(() => {
 
 describe('flag', () => {
   it('is off when the flag has no row', async () => {
-    expect(await flag('solo')).toBe(false)
+    expect(await flag('refund_prototype')).toBe(false)
   })
 
   it('reads the table at most every 30 s', async () => {
     vi.useFakeTimers()
-    const read = vi.spyOn(store(), 'getFlags').mockResolvedValue({ solo: true })
-    expect(await flag('solo')).toBe(true)
-    read.mockResolvedValue({ solo: false })
+    const read = vi.spyOn(store(), 'getFlags').mockResolvedValue({ refund_prototype: true })
+    expect(await flag('refund_prototype')).toBe(true)
+    read.mockResolvedValue({ refund_prototype: false })
     vi.advanceTimersByTime(29_000)
-    expect(await flag('solo')).toBe(true)
-    expect(await flag('daily')).toBe(false)
+    expect(await flag('refund_prototype')).toBe(true)
     expect(read).toHaveBeenCalledTimes(1)
     vi.advanceTimersByTime(1_000)
-    expect(await flag('solo')).toBe(false)
+    expect(await flag('refund_prototype')).toBe(false)
     expect(read).toHaveBeenCalledTimes(2)
   })
 
   it('turns flags on from FLAGS', async () => {
-    process.env.FLAGS = 'daily, solo'
+    process.env.FLAGS = 'other, refund_prototype'
     try {
-      expect(await flag('solo')).toBe(true)
-      expect(await flag('daily')).toBe(true)
-      expect(await flag('districts')).toBe(false)
+      expect(await flag('refund_prototype')).toBe(true)
     } finally {
       delete process.env.FLAGS
     }
@@ -48,8 +45,8 @@ describe('flag', () => {
   it('is off when the table cannot be read, and tries again next time', async () => {
     const read = vi.spyOn(store(), 'getFlags').mockRejectedValue(new Error('relation "feature_flags" does not exist'))
     vi.spyOn(console, 'error').mockImplementation(() => {})
-    expect(await flag('solo')).toBe(false)
-    read.mockResolvedValue({ solo: true })
-    expect(await flag('solo')).toBe(true)
+    expect(await flag('refund_prototype')).toBe(false)
+    read.mockResolvedValue({ refund_prototype: true })
+    expect(await flag('refund_prototype')).toBe(true)
   })
 })

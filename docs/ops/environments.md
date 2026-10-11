@@ -35,7 +35,7 @@ npm run dev
 
 - No Supabase vars: the in-memory store. Data is lost on restart.
 - `DEV_AUTH=1`: play in a normal browser as fake users (`/?dev=1&name=Ana`). Ignored in production builds.
-- `FLAGS=solo,daily` forces those flags on. Every other flag is off.
+- `FLAGS=refund_prototype` forces that flag on. Every other flag is off.
 - With the Supabase vars set, local dev uses the shared project. That's fine for now; keep `DEV_AUTH` test users on ids that can't be real Telegram ids (e.g. 1–999).
 
 ## Preview
@@ -54,9 +54,9 @@ The production bot has two Mini Apps. `Play` opens production; `preview` opens t
 1. Apply its new migration (below) and push the branch.
 2. When Vercel's Preview deploy is ready: `npm run preview:point -- <branch>` (defaults to the current branch).
 3. Turn on the feature's flag in `feature_flags`.
-4. Open `t.me/WhoRuggedBot/preview` in Telegram and play it. Crew friends join with the case code or a preview invite link.
+4. Open `t.me/WhoRuggedBot/preview` in Telegram and play it.
 
-**Careful:** previews run as the real bot on the shared database. A Stars purchase made in a preview is real and is paid to the production webhook.
+**Careful:** previews run as the real bot on the shared database, so anything a preview writes is real data.
 
 ## Production
 
@@ -72,23 +72,23 @@ Apply a branch's migration when you start testing it (it only adds, so the code 
 - **SQL editor:** Supabase dashboard → SQL Editor → paste the file → Run.
 - **Supabase CLI:** `supabase link --project-ref <ref>` then `supabase db push`.
 
-Applied so far: `0001`–`0008` (checked 2026-10-11; `scripts/backfill-v2.mjs` was run after `0004`). Update this line when you apply one.
+Applied so far: `0001`–`0008` (checked 2026-10-11). Most of their tables belong to the crew game removed on 2026-10-11 (`rooms`, `purchases`, `case_results`, `room_chats`, `cases`, …); the code now uses only `players`, `events` and `feature_flags`. Dropping the rest is a separate, deliberate migration. Update this line when you apply one.
 
 ## Feature flags
 
-New player-facing features ship off and are checked with `flag('<name>')` (`lib/flags.ts`). The list of flags is the `FlagName` type in `lib/flags.ts`; currently `solo` and `dex_crew` are on (legacy features). A missing row means off. Each server instance caches the table for 30 s, so a change takes up to 30 s to apply.
+New player-facing features ship off and are checked with `flag('<name>')` (`lib/flags.ts`). The list of flags is the `FlagName` type in `lib/flags.ts`. The table still has rows for the removed crew game (`solo`, `dex_crew`); nothing reads them. A missing row means off. Each server instance caches the table for 30 s, so a change takes up to 30 s to apply.
 
 ```sql
 -- Turn a flag on
 insert into feature_flags (name, enabled, note, updated_at)
-values ('solo', true, 'testing solo', now())
+values ('refund_prototype', true, 'testing The Refund', now())
 on conflict (name) do update set enabled = excluded.enabled, note = excluded.note, updated_at = now();
 
 -- Turn it off
-update feature_flags set enabled = false, updated_at = now() where name = 'solo';
+update feature_flags set enabled = false, updated_at = now() where name = 'refund_prototype';
 ```
 
-Locally, `FLAGS=solo,daily` in `.env.local` forces flags on without a database.
+Locally, `FLAGS=refund_prototype` in `.env.local` forces flags on without a database.
 
 ## Events and errors
 

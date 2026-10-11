@@ -9,8 +9,8 @@ const typewriter = Courier_Prime({ subsets: ['latin'], weight: ['400', '700'], v
 const code = JetBrains_Mono({ subsets: ['latin'], weight: ['400', '600'], variable: '--font-code' })
 
 export const metadata: Metadata = {
-  title: 'Who Rugged?',
-  description: 'A group-chat detective game on Telegram. Work out who rugged, why, and where the money went.',
+  title: 'Rug City',
+  description: 'A detective adventure on Telegram: uncover what really happened behind fictional crypto scandals.',
   robots: 'noindex,nofollow',
   formatDetection: { telephone: false },
 }

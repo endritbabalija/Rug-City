@@ -1,4 +1,4 @@
-// Checks that .env.local points at a Supabase project with the Who Rugged? schema.
+// Checks that .env.local points at a Supabase project with the Rug City schema.
 // Usage: node --env-file=.env.local scripts/check-supabase.mjs
 import { createClient } from '@supabase/supabase-js'
 
@@ -12,7 +12,7 @@ if (!url || !service || !anon) {
 
 let ok = true
 const admin = createClient(url, service, { auth: { persistSession: false } })
-for (const table of ['players', 'rooms', 'purchases']) {
+for (const table of ['players', 'events', 'feature_flags']) {
   const { error } = await admin.from(table).select('*', { head: true, count: 'exact' })
   if (error) {
     ok = false
@@ -22,23 +22,11 @@ for (const table of ['players', 'rooms', 'purchases']) {
 
 // The anon key must NOT be able to read game data (RLS on, no policies).
 const pub = createClient(url, anon, { auth: { persistSession: false } })
-const { data, error } = await pub.from('rooms').select('code').limit(1)
-if (error || (data && data.length === 0)) console.log('✓ anon key cannot read rooms')
+const { data, error } = await pub.from('players').select('id').limit(1)
+if (error || (data && data.length === 0)) console.log('✓ anon key cannot read players')
 else {
   ok = false
-  console.error('✗ anon key can read rooms: row level security is off')
-}
-
-// Realtime broadcast over REST, which the server uses to ping clients.
-const res = await fetch(`${url}/realtime/v1/api/broadcast`, {
-  method: 'POST',
-  headers: { apikey: service, 'Content-Type': 'application/json' },
-  body: JSON.stringify({ messages: [{ topic: 'room:CHECK', event: 'update', payload: { version: 0 }, private: false }] }),
-})
-if (res.ok) console.log('✓ realtime broadcast works')
-else {
-  ok = false
-  console.error(`✗ realtime broadcast: HTTP ${res.status} ${await res.text()}`)
+  console.error('✗ anon key can read players: row level security is off')
 }
 
 console.log(ok ? '\nSupabase is ready.' : '\nFix the ✗ items above.')

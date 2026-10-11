@@ -10,10 +10,10 @@ Rules every agent follows when writing code here. When a brief and this file dis
    - `maxDuration`: `01-app/03-api-reference/03-file-conventions/02-route-segment-config/maxDuration.md`
    - Upgrade notes: `01-app/02-guides/upgrading/version-16.md`
    - Known differences: `params` is a Promise, there is no `next lint`, `middleware` is now `proxy`, runtime config is gone (read `process.env`).
-2. **Rules stay pure.** Game rules live in `lib/game/*` as pure functions that take state and return new state or throw `GameError`. Routes and `lib/rooms.ts` only load, call the rules, and save. Follow `lib/game/engine.ts` and `lib/game/progress.ts`. New investigation rules (The Refund) live in their own module, not in the legacy vote engine.
+2. **Rules stay pure.** Game rules are pure functions that take state and return new state or throw `AppError` (`lib/errors.ts`). Routes and services only load, call the rules, and save.
 3. **Store parity.** All data access goes through the `Store` interface in `lib/store/types.ts`, implemented in **both** `lib/store/memory.ts` and `lib/store/supabase.ts`. Tests and local dev run on the memory store.
-4. **Server decides.** Hidden case data (answers, suspect truths and lies, other players' clues) never reaches the client. Every response goes through a projection like `buildView` in `lib/game/view.ts`.
-5. **Idempotent rewards.** Points, items, results and jobs must be safe to run twice: unique keys, plus the claim-then-act pattern in `settleAfter` (`lib/rooms.ts`).
+4. **Server decides.** Hidden case data (answers, undiscovered evidence, future dialogue) never reaches the client. Every response goes through a projection that returns only what this player has unlocked.
+5. **Idempotent writes.** Unlocks, completions and jobs must be safe to run twice: unique keys and versioned writes (`updatePlayer` in `lib/store/supabase.ts` shows the compare-and-swap).
 6. **Provisional values** live in one named constant, never a literal in the code.
 7. **Match the surrounding code:** naming, comment density, small files, zod for request bodies, `route()` and `authenticate()` from `lib/server.ts` for every API route.
 
@@ -25,12 +25,12 @@ Rules every agent follows when writing code here. When a brief and this file dis
 
 ## Content
 
-11. Everything is fictional parody: no real people, projects, exchanges or wallet addresses. Cases show how scams are caught, never how to run one. AI prompts keep the guardrails in `lib/ai/suspect.ts`.
+11. Everything is fictional parody: no real people, projects, exchanges or wallet addresses. Cases show how scams are caught, never how to run one.
 
 ## Tests
 
-12. Follow `tests/flow.test.ts`: mock `@/lib/telegram/bot-api`, delete `NEXT_PUBLIC_SUPABASE_URL` and `ANTHROPIC_API_KEY`, take fresh player ids from a counter, and drive `lib/rooms.ts` directly. Set env vars such as `ADMIN_TELEGRAM_IDS` inside try/finally (`env()` re-reads `process.env` each call).
-13. Pure rules get unit tests like `tests/progress.test.ts`. Every case-level rule also runs over every case, like `tests/cases.test.ts`.
+12. Follow `tests/auth.test.ts`: delete `NEXT_PUBLIC_SUPABASE_URL` before importing so the memory store is used, call route handlers or services directly, and reset the store between tests. Set env vars inside try/finally (`env()` re-reads `process.env` each call).
+13. Pure rules get unit tests. Checks that apply to case content (every record reachable, every finding supported) run over every authored case.
 
 ## Done checks
 

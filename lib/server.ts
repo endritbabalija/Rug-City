@@ -2,14 +2,9 @@ import 'server-only'
 import * as Sentry from '@sentry/nextjs'
 import { NextResponse } from 'next/server'
 import { ZodError } from 'zod'
-import { track } from './analytics'
 import { env } from './env'
-import { caseForRoom } from './cases'
-import { GameError } from './game/engine'
-import { progressSummary, seasonAt } from './game/progress'
-import { flag } from './flags'
-import { freeCasesToday, newPlayer, type Player, type RecentCase } from './player'
-import { getSeasons } from './seasons'
+import { AppError } from './errors'
+import { newPlayer, type Player } from './player'
 import { store } from './store'
 import { ConflictError } from './store/types'
 import { displayName, InitDataError, validateInitData, type InitData } from './telegram/init-data'
@@ -39,7 +34,7 @@ function readProfile(req: Request): { profile: Profile; init: InitData | null } 
     if (!Number.isSafeInteger(id) || id <= 0) throw new InitDataError('Bad dev user')
     return { profile: { id, name: decodeURIComponent(nameParts.join(':')) || `Dev ${id}` }, init: null }
   }
-  throw new InitDataError('Open Who Rugged? from Telegram.')
+  throw new InitDataError('Open Rug City from Telegram.')
 }
 
 /**
@@ -52,11 +47,7 @@ export async function authenticate(req: Request): Promise<Session> {
   const db = store()
   let player = await db.getPlayer(profile.id)
   if (!player) {
-    // A player who arrives through someone's room link counts as that host's referral.
-    const startParam = init ? init.startParam : (req.headers.get('x-start-param') ?? undefined)
-    const room = startParam ? await db.getRoom(startParam.toUpperCase()) : null
-    player = await db.createPlayer(newPlayer(profile, Date.now(), room?.hostId))
-    if (player.referredBy) track('invite_joined', player.id, { referrer: player.referredBy })
+    player = await db.createPlayer(newPlayer(profile, Date.now()))
   } else if (player.name !== profile.name || player.photoUrl !== profile.photoUrl) {
     player = await db.updatePlayer(profile.id, (p) => ({ ...p, name: profile.name, username: profile.username, photoUrl: profile.photoUrl }))
   }
@@ -65,27 +56,8 @@ export async function authenticate(req: Request): Promise<Session> {
   return { player, init }
 }
 
-export const isAdmin = (playerId: number) => env().adminIds.includes(playerId)
-
-/** `authenticate`, then 403 unless the player is in ADMIN_TELEGRAM_IDS. */
-export async function authenticateAdmin(req: Request): Promise<Session> {
-  const session = await authenticate(req)
-  if (!isAdmin(session.player.id)) throw new GameError('FORBIDDEN', 'Admins only.', 403)
-  return session
-}
-
-/**
- * The light path for frequent reads (room polling): verifies the init data and returns the
- * user id, without loading or updating the player.
- */
-export function authenticateId(req: Request): number {
-  const { id } = readProfile(req).profile
-  Sentry.setTag('player', id)
-  return id
-}
-
-export function errorResponse(err: unknown, tags: Record<string, string> = {}) {
-  if (err instanceof GameError) return NextResponse.json({ error: { code: err.code, message: err.message } }, { status: err.status })
+export function errorResponse(err: unknown) {
+  if (err instanceof AppError) return NextResponse.json({ error: { code: err.code, message: err.message } }, { status: err.status })
   if (err instanceof InitDataError)
     return NextResponse.json({ error: { code: 'UNAUTHORIZED', message: err.message } }, { status: 401 })
   if (err instanceof ZodError || err instanceof SyntaxError)
@@ -93,7 +65,7 @@ export function errorResponse(err: unknown, tags: Record<string, string> = {}) {
   if (err instanceof ConflictError)
     return NextResponse.json({ error: { code: 'BUSY', message: 'Lots happening at once, try again.' } }, { status: 409 })
   console.error(err)
-  Sentry.captureException(err, { tags })
+  Sentry.captureException(err)
   return NextResponse.json({ error: { code: 'SERVER', message: 'Something went wrong.' } }, { status: 500 })
 }
 
@@ -102,51 +74,12 @@ export function route<Ctx>(fn: (req: Request, ctx: Ctx) => Promise<Response>) {
     try {
       return await fn(req, ctx)
     } catch (err) {
-      return errorResponse(err, await roomTag(ctx))
+      return errorResponse(err)
     }
   }
 }
 
-/** The room code from a `[code]` route's params, as a Sentry tag. */
-async function roomTag(ctx: unknown): Promise<Record<string, string>> {
-  try {
-    const params = await (ctx as { params?: Promise<{ code?: unknown }> } | undefined)?.params
-    return typeof params?.code === 'string' ? { room: params.code.toUpperCase() } : {}
-  } catch {
-    return {}
-  }
-}
+/** What the client may know about the signed-in player. */
+export const publicPlayer = (p: Player) => ({ id: p.id, name: p.name })
 
-/** Cases shown under "Recent cases" on the profile. */
-const RECENT_CASES = 10
-
-export async function publicPlayer(p: Player) {
-  const now = Date.now()
-  const seasons = await getSeasons()
-  const [badges, seasonScores, results, dayOne] = await Promise.all([
-    store().getBadges(p.id),
-    store().seasonScores(p.id, seasonAt(now, seasons)),
-    store().recentResults(p.id, RECENT_CASES),
-    flag('tutorial'),
-  ])
-  const free = freeCasesToday(p, now, dayOne)
-  const files = await Promise.all(results.map((r) => caseForRoom(r.caseId)))
-  const recent = results.flatMap((r, i): RecentCase[] => {
-    const c = files[i]
-    return c ? [{ caseId: r.caseId, title: c.title, at: r.at, points: r.total, correct: r.correct, rating: r.rating, unrated: r.unrated }] : []
-  })
-  return {
-    id: p.id,
-    name: p.name,
-    caseCredits: p.caseCredits,
-    freeCaseAvailable: free > 0,
-    /** Free cases left today: up to DAY_ONE_FREE_CASES on the signup day (flag `tutorial`), else 0 or 1. */
-    freeCasesToday: free,
-    items: p.items,
-    badges,
-    activeBadge: p.activeBadge ?? null,
-    progress: progressSummary(p, now, { seasons, seasonScores, recent }),
-  }
-}
-
-export type PublicPlayer = Awaited<ReturnType<typeof publicPlayer>>
+export type PublicPlayer = ReturnType<typeof publicPlayer>

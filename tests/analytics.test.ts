@@ -24,8 +24,8 @@ describe('track', () => {
   it('never throws when the store fails', async () => {
     vi.spyOn(store(), 'trackEvents').mockRejectedValue(new Error('relation "events" does not exist'))
     const err = vi.spyOn(console, 'error').mockImplementation(() => {})
-    expect(() => track('case_start', null)).not.toThrow()
+    expect(() => track('app_open', null)).not.toThrow()
     await settle()
-    expect(err).toHaveBeenCalledWith('Event write failed', 'case_start', expect.any(Error))
+    expect(err).toHaveBeenCalledWith('Event write failed', 'app_open', expect.any(Error))
   })
 })
