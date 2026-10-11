@@ -234,6 +234,8 @@ Inspect current code rather than copying stale APIs from this brief. Relevant ex
 
 Suggested small modules: `lib/investigation/types.ts`, `rules.ts`, `view.ts`, `refund.ts` (server-only content), a service and a few investigation components. Actual layout should fit the repository. Do not import hidden content into client bundles.
 
+**The Refund is chapter 1, not the whole game.** `Rug City — Game Direction.md` describes four later cases that each need a different kind of reasoning (grouping accounts, tracing money, comparing sources, connecting cases) and a later two-player co-op mode. Follow its section 9 boundaries so those don't need a rewrite: keep the *case definition* (authored, server-only content) separate from the *investigation run* (one player's discoveries, pinned to a content version), and leave *campaign progress* (completed chapters) as a documented boundary, not built yet. Keep Refund's checks as a small typed validator for its own interaction, not a universal rules engine. Keep personal UI state (selected tab, drafts) out of the persisted run, so shared co-op state can be added later without untangling it. Do not build later cases, co-op, campaign persistence or a generic framework now.
+
 ## Persisted run
 
 Minimum fields: run ID, owner player ID, case ID `the-refund`, case version, state version, status (`intro`, `investigating`, `resolved`), discovered evidence IDs, findings, completed confrontations, visited topics, scripted transcript events, hint levels, created/updated/resolved timestamps. Pinning may also persist. Do not use time to gate narrative access.
@@ -290,7 +292,7 @@ Use run/case/version/action IDs, success and hint level; never store raw chat te
 
 Run the repo's typecheck, lint, tests and build. Add targeted pure-rule and store-flow tests for the criteria above; preserve meaningful existing regression coverage. Inspect the new experience at mobile dimensions and with keyboard controls if local browser tooling is available. Run the happy path and one alternate path manually; report any browser/Telegram checks you could not perform. Do not label code tests as human playtest evidence.
 
-Deliver changed-file summary, checks and results, exact local launch steps, any additive migration awaiting application, and screenshots only if available from actual inspection. No fabricated test counts or deployment claims.
+Write a short architecture note at `docs/architecture.md` (the earlier one is archived): what The Refund implements, and the extension points for later cases, campaign progress and co-op from Game Direction section 9. Deliver changed-file summary, checks and results, exact local launch steps, any additive migration awaiting application, and screenshots only if available from actual inspection. No fabricated test counts or deployment claims.
 
 # 11. Human playtest after implementation
 
@@ -302,7 +304,7 @@ Do not add features to compensate for a weak case. Revise the evidence, clarity 
 
 # 12. Copy-and-paste kickoff prompt
 
-> Read `Rug City — The Refund Brief.md` completely, then inspect the current Rug-City main branch, `AGENTS.md` and repository conventions. Implement this isolated solo investigation prototype on a new local branch. Treat the brief as the current product scope; the previous Phase 1 roadmap is background, not a requirement to add more systems. Preserve the existing game.
+> Read `Rug City — The Refund Brief.md` completely, and `Rug City — Game Direction.md` for where the game is going (at least sections 1, 7, 8 and 9). The Refund is chapter 1 of a five-chapter arc with co-op planned later: build only The Refund, but keep the architecture boundaries in brief section 9 so later chapters fit. Then inspect the current Rug-City main branch, `AGENTS.md` and repository conventions. Implement the solo investigation on a new branch. Treat the brief as the current product scope; the archived Phase 1 roadmap is background only. The old crew game has been removed; build on the remaining foundation.
 >
 > Start with the canonical case data, pure rules and server projection; implement persistence and the mobile player journey; then run the required checks. Resolve routine implementation details yourself. If the evidence or gating has a genuine logical contradiction, flag it explicitly before changing the story. Do not invent extra mechanics or rely on AI to judge deductions. Finish with a runnable local prototype and verification report. Follow the brief's limits on commits, deployment and shared database changes.
 
