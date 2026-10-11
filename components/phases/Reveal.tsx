@@ -1,11 +1,9 @@
 'use client'
 
 import { useEffect } from 'react'
-import { api } from '@/lib/client/api'
 import { UNRATED_REASON } from '@/lib/game/progress'
 import { CASE_MAX, CASE_POINTS, HELP_PENALTY, HELP_PENALTY_CAP, PENALIZE_CLUE_POINTS } from '@/lib/game/scoring'
 import type { Help } from '@/lib/game/types'
-import type { PublicPlayer } from '@/lib/server'
 import { canShareStory, haptic, shareStory, shareToChat } from '@/lib/telegram/webapp'
 import { useGame } from '../GameContext'
 import { inviteLink, type PhaseProps } from '../Room'
@@ -18,7 +16,7 @@ const HELP_LABEL: Record<keyof Help, string> = { hint: 'Hint', trace: 'Trace', s
 const pct = (share: number) => `${Math.round(share * 100)}%`
 
 export function Reveal({ room, now }: PhaseProps) {
-  const { go, setPlayer } = useGame()
+  const { go, refresh } = useGame()
   const r = room.result!
   const award = r.myAward
   const settled = award !== null
@@ -40,13 +38,10 @@ export function Reveal({ room, now }: PhaseProps) {
     else haptic.thud()
   }, [caught])
 
-  // Points are written when the room settles; pick up the new totals for the profile.
+  // Points are written when the room settles; pick up the new totals and the case's played state.
   useEffect(() => {
-    if (!settled) return
-    api<{ player: PublicPlayer }>('/api/me')
-      .then((res) => setPlayer(res.player))
-      .catch(() => {})
-  }, [settled, setPlayer])
+    if (settled) refresh().catch(() => {})
+  }, [settled, refresh])
 
   const isAnswer = (field: 'culprit' | 'motive' | 'trail', id: string) => r.answer[field] === id
   const leads = r.crew.filter((p) => p.correct === 3)

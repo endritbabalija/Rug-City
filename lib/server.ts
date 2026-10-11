@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server'
 import { ZodError } from 'zod'
 import { track } from './analytics'
 import { env } from './env'
-import { getCase } from './cases'
+import { caseForRoom } from './cases'
 import { GameError } from './game/engine'
 import { progressSummary, seasonAt } from './game/progress'
 import { hasFreeCase, newPlayer, type Player, type RecentCase } from './player'
@@ -118,8 +118,9 @@ export async function publicPlayer(p: Player) {
     store().seasonScores(p.id, seasonAt(now, seasons)),
     store().recentResults(p.id, RECENT_CASES),
   ])
-  const recent = results.flatMap((r): RecentCase[] => {
-    const c = getCase(r.caseId)
+  const files = await Promise.all(results.map((r) => caseForRoom(r.caseId)))
+  const recent = results.flatMap((r, i): RecentCase[] => {
+    const c = files[i]
     return c ? [{ caseId: r.caseId, title: c.title, at: r.at, points: r.total, correct: r.correct, rating: r.rating, unrated: r.unrated }] : []
   })
   return {

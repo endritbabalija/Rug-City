@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api, ApiError, isTelegram, launchRoomCode } from '@/lib/client/api'
-import type { CaseSummary } from '@/lib/cases'
+import type { CaseSummary, DistrictSummary } from '@/lib/cases'
 import type { Sku } from '@/lib/catalog'
 import type { PublicPlayer } from '@/lib/server'
 import { bindBackButton, haptic, initTelegram, openInvoice } from '@/lib/telegram/webapp'
 import { GameContext, type GameCtx, type Screen } from './GameContext'
+import { District } from './District'
 import { Home } from './Home'
 import { Leaderboard } from './Leaderboard'
 import { Profile } from './Profile'
@@ -17,6 +18,8 @@ import { Tape } from './ui'
 interface MeResponse {
   player: PublicPlayer
   cases: CaseSummary[]
+  districts: DistrictSummary[]
+  nextDrop: string | null
   skus: Sku[]
   badges: GameCtx['badges']
   flags: GameCtx['flags']
@@ -59,6 +62,7 @@ export function Game() {
   useEffect(() => bindBackButton(screen.name === 'home' ? null : () => setScreen({ name: 'home' })), [screen.name])
 
   const setPlayer = useCallback((player: PublicPlayer) => setMe((m) => (m ? { ...m, player } : m)), [])
+  const refresh = useCallback(async () => setMe(await api<MeResponse>('/api/me')), [])
 
   const buy = useCallback(
     // eslint-disable-next-line react-hooks/preserve-manual-memoization -- existing code; deps are correct
@@ -97,8 +101,24 @@ export function Game() {
   )
 
   const ctx = useMemo<GameCtx | null>(
-    () => (me ? { player: me.player, setPlayer, cases: me.cases, skus: me.skus, badges: me.badges, flags: me.flags, go: setScreen, toast, buy } : null),
-    [me, setPlayer, toast, buy],
+    () =>
+      me
+        ? {
+            player: me.player,
+            setPlayer,
+            refresh,
+            cases: me.cases,
+            districts: me.districts,
+            nextDrop: me.nextDrop,
+            skus: me.skus,
+            badges: me.badges,
+            flags: me.flags,
+            go: setScreen,
+            toast,
+            buy,
+          }
+        : null,
+    [me, setPlayer, refresh, toast, buy],
   )
 
   if (bootError) {
@@ -128,6 +148,7 @@ export function Game() {
         {screen.name === 'shop' && <Shop />}
         {screen.name === 'profile' && <Profile />}
         {screen.name === 'leaderboard' && <Leaderboard />}
+        {screen.name === 'district' && <District key={screen.id} id={screen.id} />}
         {screen.name === 'room' && <Room key={screen.code} code={screen.code} />}
       </main>
       <div className="pointer-events-none fixed inset-x-0 top-0 z-50 flex flex-col items-center gap-2 p-3 safe-top">

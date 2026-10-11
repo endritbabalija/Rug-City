@@ -344,4 +344,6 @@ export const airdrop: CaseFile = {
   ],
   // 15 minutes until playtests give a better number.
   targetSec: 900,
+  district: 'sybil-square',
+  preview: true,
 }

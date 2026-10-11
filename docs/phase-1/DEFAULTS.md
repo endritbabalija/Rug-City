@@ -7,7 +7,7 @@ To change one before its slice starts, edit this file. After the slice is merged
 | Decision | Default | Lives in | Slice |
 | --- | --- | --- | --- |
 | Rank ladder | Rookie 0 · Inspector 500 · Chief 2,500 · Legend 10,000 Clue Points | `RANKS`, `lib/game/progress.ts` | 2 |
-| District unlocks | Memecoin Swamp: Rookie. Sybil Square and DeFi Docks: locked, with one teaser case each that anyone can play | `DISTRICTS`, `lib/districts.ts` | 5 |
+| District unlocks | Memecoin Swamp: Rookie. Sybil Square: Inspector. DeFi Docks: Chief. Districts 4–6: Legend. Sybil Square and DeFi Docks have one teaser (preview) case each that anyone can play while locked. Districts without cases stay off the map | `DISTRICTS` (`unlockRank`), `lib/districts.ts` | 5 |
 | Help penalties | Hint 10%, Trace 15%, Subpoena 25%, Dex hint 10% of the case score. They add up, capped at 90%, and apply to every seat in the room | `HELP_PENALTY`, `HELP_PENALTY_CAP`, `lib/game/scoring.ts` | 2 |
 | Penalties on Clue Points | Yes: the penalty cuts both the case's Clue Points and its rating score | `PENALIZE_CLUE_POINTS`, `lib/game/scoring.ts` | 2 |
 | Time score | Full 20 points at or under the target time, sliding to 0 at 2× the target | `timeScore()`, `lib/game/scoring.ts` | 2 |

@@ -375,4 +375,6 @@ export const audit: CaseFile = {
   ],
   // 15 minutes until playtests give a better number.
   targetSec: 900,
+  district: 'defi-docks',
+  preview: true,
 }

@@ -2,7 +2,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { Season } from '../game/progress'
 import type { CaseResultRow, CaseStats, RoomState } from '../game/types'
 import type { Player } from '../player'
-import { CONFLICT, withRetries, type ChatRow, type Purchase, type PurchaseStatus, type SeasonRating, type Store } from './types'
+import { CONFLICT, withRetries, type CaseMeta, type CaseStatus, type ChatRow, type Purchase, type PurchaseStatus, type SeasonRating, type Store } from './types'
 
 interface PlayerRow {
   id: number
@@ -118,6 +118,25 @@ const toCaseStats = (r: CaseStatsRow): CaseStats => ({
   minSec: r.min_sec ?? undefined,
   plays: r.plays,
   updatedAt: Date.parse(r.updated_at),
+})
+
+interface CaseDbRow {
+  id: string
+  district: string
+  status: CaseStatus
+  release_at: string | null
+  version: number
+  data?: unknown
+}
+
+const CASE_META_COLUMNS = 'id, district, status, release_at, version'
+
+const toCaseMeta = (r: CaseDbRow): CaseMeta => ({
+  id: r.id,
+  district: r.district,
+  status: r.status,
+  releaseAt: r.release_at === null ? null : Date.parse(r.release_at),
+  version: r.version,
 })
 
 interface ChatDbRow {
@@ -303,6 +322,10 @@ export function createSupabaseStore(url: string, serviceKey: string): Store {
       check(res)
       return (res.count ?? 0) > 0
     },
+    async playedCaseIds(playerId) {
+      const rows = check(await db.from('case_results').select('case_id').eq('player_id', playerId)) as { case_id: string }[]
+      return [...new Set(rows.map((r) => r.case_id))]
+    },
     async recentResults(playerId, limit) {
       const rows = check(await db.from('case_results').select('*').eq('player_id', playerId).order('at', { ascending: false }).limit(limit))
       return (rows as CaseResultDbRow[]).map(toResult)
@@ -347,6 +370,28 @@ export function createSupabaseStore(url: string, serviceKey: string): Store {
     async getSeasons() {
       const rows = check(await db.from('seasons').select('id, starts_at, ends_at')) as { id: number; starts_at: string; ends_at: string }[]
       return rows.map((r) => ({ id: r.id, start: Date.parse(r.starts_at), end: Date.parse(r.ends_at) }))
+    },
+
+    async listCaseMeta() {
+      const rows = check(await db.from('cases').select(CASE_META_COLUMNS)) as CaseDbRow[]
+      return rows.map(toCaseMeta)
+    },
+    async getCaseRow(id) {
+      const row = check(await db.from('cases').select(`${CASE_META_COLUMNS}, data`).eq('id', id).maybeSingle()) as CaseDbRow | null
+      return row ? { ...toCaseMeta(row), data: row.data } : null
+    },
+    async saveCase(r) {
+      check(
+        await db.from('cases').upsert({
+          id: r.id,
+          district: r.district,
+          status: r.status,
+          release_at: r.releaseAt === null ? null : iso(r.releaseAt),
+          version: r.version,
+          data: r.data,
+          updated_at: new Date().toISOString(),
+        }),
+      )
     },
 
     async getCaseStats(caseId, mode) {

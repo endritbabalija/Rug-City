@@ -1,26 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { api, ApiError } from '@/lib/client/api'
+import { CaseCard } from './CaseCard'
+import { DistrictMap } from './District'
 import { useGame } from './GameContext'
 import { Button, Label, Pill, Stamp, Tape } from './ui'
 
 export function Home() {
   const { player, cases, badges, flags, go, toast } = useGame()
-  const [busy, setBusy] = useState<string | null>(null)
   const [code, setCode] = useState('')
-
-  async function open(caseId: string, solo: boolean) {
-    setBusy(`${caseId}:${solo ? 'solo' : 'crew'}`)
-    try {
-      const res = await api<{ code: string }>(solo ? '/api/solo' : '/api/rooms', { caseId })
-      go({ name: 'room', code: res.code })
-    } catch (e) {
-      toast(e instanceof ApiError ? e.message : 'Could not open the case.', 'error')
-    } finally {
-      setBusy(null)
-    }
-  }
 
   const badge = player.activeBadge ? badges[player.activeBadge] : null
   const { season } = player.progress
@@ -74,28 +62,16 @@ export function Home() {
         </button>
       </section>
 
-      <section className="mt-6 space-y-5 px-5">
-        <Label>Open case files</Label>
-        {cases.map((c, i) => (
-          <article key={c.id} className="paper relative animate-rise overflow-hidden rounded-sm p-5" style={{ animationDelay: `${i * 90}ms`, rotate: `${i % 2 ? 0.6 : -0.5}deg` }}>
-            <div className="flex items-start justify-between gap-3">
-              <div className="font-type text-xs tracking-widest text-paper-ink/60 uppercase">Case {(i + 1).toString().padStart(2, '0')} · {c.ticker}</div>
-              <div className="font-type text-xs text-paper-ink/60">{c.suspects} suspects</div>
-            </div>
-            <h2 className="mt-2 font-display text-[2.1rem] leading-none font-black uppercase">{c.title}</h2>
-            <p className="mt-1 font-type text-sm font-bold text-rug uppercase">{c.crime}</p>
-            <p className="mt-3 font-type text-[15px] leading-snug">{c.tagline}</p>
-            <Button className="mt-4 w-full" busy={busy === `${c.id}:crew`} onClick={() => open(c.id, false)}>
-              Host this case
-            </Button>
-            {flags.solo && (
-              <Button variant="paper" className="mt-2 w-full border border-paper-ink/30" busy={busy === `${c.id}:solo`} onClick={() => open(c.id, true)}>
-                🕵️ Play solo with Dex
-              </Button>
-            )}
-          </article>
-        ))}
-      </section>
+      {flags.districts ? (
+        <DistrictMap />
+      ) : (
+        <section className="mt-6 space-y-5 px-5">
+          <Label>Open case files</Label>
+          {cases.map((c, i) => (
+            <CaseCard key={c.id} c={c} index={i} />
+          ))}
+        </section>
+      )}
 
       <section className="mt-8 px-5">
         <Label>Got a case code?</Label>
