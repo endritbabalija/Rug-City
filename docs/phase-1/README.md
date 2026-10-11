@@ -46,7 +46,7 @@ Agents update this table at the end of each session.
 | # | Status | Branch | PR | Notes |
 | --- | --- | --- | --- | --- |
 | 0 | Done | `phase1/00-foundation` | [#1](https://github.com/endritbabalija/Rug-City/pull/1) | `0003` applied; Supabase vars on Preview; production writes `app_open`; a test error reached Sentry. Known issue: `who-rugged-blond.vercel.app` is unreachable from some networks (Endrit's home Wi-Fi); a custom domain fixes it, before launch |
-| 1 | Not started | | | |
+| 1 | In review | `phase1/01-data-model` | | Code, tests and local check done (memory store, `season_banner` on). `0004` applied and backfill run on the shared database (4 players; backup in `../Who-Rugged-backups/`). Not yet done: check a preview deploy with an old player; run the backfill again right after merging. Leftover: preview-only players have `doc = null`, which the code on `main` can't read |
 | 2 | Not started | | | |
 | 3 | Not started | | | |
 | 4 | Not started | | | |

@@ -1,16 +1,35 @@
 // In-process store for local development and tests. Data is lost on restart and
 // is not shared between serverless instances, so production must use Supabase.
 
-import type { RoomState } from '../game/types'
+import type { Season } from '../game/progress'
+import type { CaseResultRow, RoomState } from '../game/types'
 import type { Player } from '../player'
-import type { AppEvent, Purchase, PurchaseStatus, SeasonRating, Store } from './types'
+import type { AppEvent, ChatRow, Purchase, PurchaseStatus, SeasonRating, Store } from './types'
 
 const clone = <T,>(v: T): T => structuredClone(v)
+
+const DAY = 86_400_000
+const season = (id: number, start: number, days: number): Season => ({ id, start, end: start + days * DAY })
+/** Same rows as the `seasons` seed in supabase/migrations/0004_player_tables.sql. */
+export const SEASON_SEED: Season[] = [
+  season(1, Date.UTC(2026, 9, 5), 28),
+  season(2, Date.UTC(2026, 10, 2), 28),
+  season(3, Date.UTC(2026, 10, 30), 28),
+  season(4, Date.UTC(2026, 11, 28), 56),
+  season(5, Date.UTC(2027, 1, 22), 56),
+  season(6, Date.UTC(2027, 3, 19), 56),
+  season(7, Date.UTC(2027, 5, 14), 56),
+  season(8, Date.UTC(2027, 7, 9), 56),
+]
 
 const byStanding = (a: SeasonRating, b: SeasonRating) => b.rating - a.rating || a.updatedAt - b.updatedAt || a.playerId - b.playerId
 
 export function createMemoryStore(): Store {
   const players = new Map<number, Player>()
+  const badges = new Map<number, Set<string>>()
+  const rewards = new Set<string>()
+  const results: CaseResultRow[] = []
+  const chats: ChatRow[] = []
   const rooms = new Map<string, RoomState>()
   const purchases = new Map<string, Purchase>()
   const ratings = new Map<string, SeasonRating>()
@@ -33,6 +52,59 @@ export function createMemoryStore(): Store {
       const next = fn(clone(current))
       players.set(id, clone(next))
       return next
+    },
+
+    async getBadges(playerId) {
+      return [...(badges.get(playerId) ?? [])]
+    },
+    async addBadge(playerId, badge) {
+      badges.set(playerId, (badges.get(playerId) ?? new Set()).add(badge))
+    },
+    async removeBadge(playerId, badge) {
+      badges.get(playerId)?.delete(badge)
+    },
+
+    async hasSeasonReward(season, playerId) {
+      return rewards.has(`${season}:${playerId}`)
+    },
+    async addSeasonReward(season, playerId) {
+      const key = `${season}:${playerId}`
+      if (rewards.has(key)) return false
+      rewards.add(key)
+      return true
+    },
+
+    async insertCaseResult(row) {
+      if (results.some((r) => r.roomCode === row.roomCode && r.playerId === row.playerId)) return false
+      results.push(clone(row))
+      return true
+    },
+    async hasPlayed(playerId, caseId) {
+      return results.some((r) => r.playerId === playerId && r.caseId === caseId)
+    },
+    async recentResults(playerId, limit) {
+      return clone(results.filter((r) => r.playerId === playerId).sort((a, b) => b.at - a.at).slice(0, limit))
+    },
+    async seasonScores(playerId, s) {
+      return results.filter((r) => r.playerId === playerId && r.rating !== undefined && r.at >= s.start && r.at < s.end).map((r) => r.rating!)
+    },
+
+    async getChats(code, playerId) {
+      return clone(chats.filter((c) => c.roomCode === code && c.playerId === playerId).sort((a, b) => a.seq - b.seq))
+    },
+    async appendChat(row) {
+      if (chats.some((c) => c.roomCode === row.roomCode && c.playerId === row.playerId && c.suspectId === row.suspectId && c.seq === row.seq))
+        throw new Error('Chat message already exists')
+      chats.push(clone(row))
+    },
+    async deleteLastChat(code, playerId, suspectId) {
+      const thread = chats.filter((c) => c.roomCode === code && c.playerId === playerId && c.suspectId === suspectId)
+      const last = thread.reduce<ChatRow | null>((a, c) => (!a || c.seq > a.seq ? c : a), null)
+      if (last) chats.splice(chats.indexOf(last), 1)
+    },
+
+    async getSeasons() {
+      return clone(SEASON_SEED)
     },
 
     async createRoom(state) {

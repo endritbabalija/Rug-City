@@ -34,7 +34,7 @@ Set `FLAGS=solo,daily` to turn feature flags on locally. CI (`.github/workflows/
 
 ## Deploy
 
-1. **Supabase**: create a project and run every file in `supabase/migrations/` in order. Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY`.
+1. **Supabase**: create a project and run every file in `supabase/migrations/` in order. Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY`. A database that already had players before `0004_player_tables.sql` also needs `node --env-file=.env.local scripts/backfill-v2.mjs` once (back up first; `--dry-run` prints what it would do).
 2. **Bot**: create it in @BotFather, then `/newapp` to register the Mini App and pick a short name. Set `TELEGRAM_BOT_TOKEN`, `NEXT_PUBLIC_BOT_USERNAME`, `NEXT_PUBLIC_APP_SHORT_NAME`, a random `TELEGRAM_WEBHOOK_SECRET`, and `ADMIN_TELEGRAM_IDS` (who may `/refund`).
 3. **AI**: set `ANTHROPIC_API_KEY` (optional; scripted replies without it). `SUSPECT_MODEL` defaults to `claude-haiku-5-5`.
    **Errors**: set `SENTRY_DSN` and `NEXT_PUBLIC_SENTRY_DSN` (optional; Sentry is off without them).

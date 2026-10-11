@@ -20,5 +20,6 @@ export const POST = route<Ctx>(async (req, { params }) => {
   const action = Action.parse(await req.json())
   await act(code, player, action)
   const fresh = (await store().getPlayer(player.id)) ?? player
-  return NextResponse.json({ room: await viewRoom(code, fresh), player: publicPlayer(fresh) })
+  const [room, pub] = await Promise.all([viewRoom(code, fresh), publicPlayer(fresh)])
+  return NextResponse.json({ room, player: pub })
 })

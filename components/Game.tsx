@@ -19,6 +19,7 @@ interface MeResponse {
   cases: CaseSummary[]
   skus: Sku[]
   badges: GameCtx['badges']
+  flags: GameCtx['flags']
 }
 
 interface Toast {
@@ -96,7 +97,7 @@ export function Game() {
   )
 
   const ctx = useMemo<GameCtx | null>(
-    () => (me ? { player: me.player, setPlayer, cases: me.cases, skus: me.skus, badges: me.badges, go: setScreen, toast, buy } : null),
+    () => (me ? { player: me.player, setPlayer, cases: me.cases, skus: me.skus, badges: me.badges, flags: me.flags, go: setScreen, toast, buy } : null),
     [me, setPlayer, toast, buy],
   )
 

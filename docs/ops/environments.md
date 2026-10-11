@@ -63,7 +63,7 @@ Apply a slice's migration when you start testing its branch (it only adds, so th
 - **SQL editor:** Supabase dashboard → SQL Editor → paste the file → Run.
 - **Supabase CLI:** `supabase link --project-ref <ref>` then `supabase db push`.
 
-Applied so far: `0001`, `0002`. **Pending: `0003_events_flags.sql`.** Update this line when you apply one.
+Applied so far: `0001`–`0004`. **Pending: run `scripts/backfill-v2.mjs`** (slice 1, after `0004`). Update this line when you apply one.
 
 ## Feature flags
 
