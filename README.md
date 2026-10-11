@@ -7,7 +7,7 @@ A detective adventure as a Telegram Mini App: uncover the human choices behind f
 - **Coding rules:** [`docs/CONVENTIONS.md`](./docs/CONVENTIONS.md) · **Environments:** [`docs/ops/environments.md`](./docs/ops/environments.md)
 - **Old design (superseded):** [`docs/archive/`](./docs/archive/)
 
-The earlier crew game (*Who Rugged?*) was removed on 2026-10-11. The code is now the foundation The Refund builds on: Telegram login, storage, feature flags, analytics, error tracking and the noir UI. Home shows a placeholder until The Refund lands.
+The earlier crew game (*Who Rugged?*) was removed on 2026-10-11. The code is now the foundation The Refund builds on: Telegram login, storage, feature flags, analytics, error tracking and the noir UI. The Refund is built behind the `refund_prototype` flag (architecture: [`docs/architecture.md`](./docs/architecture.md)); with the flag off, Home shows a placeholder.
 
 ## Stack
 

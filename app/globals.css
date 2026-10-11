@@ -127,6 +127,12 @@ body::after {
   mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='2'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -2.2 1.6'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
 }
 
+/* Keyboard focus is always visible; taps don't show it. */
+:focus-visible {
+  outline: 3px solid var(--color-tape);
+  outline-offset: 2px;
+}
+
 .scroll-x {
   scrollbar-width: none;
 }
