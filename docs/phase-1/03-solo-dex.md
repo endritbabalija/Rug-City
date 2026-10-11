@@ -38,7 +38,7 @@ A player can play any open case alone with Detective Dex as partner. This slice 
 
 ## Done when
 
-- On staging inside Telegram, a solo case plays end to end with Dex and shows up on the profile as rated.
+- On a preview deploy inside Telegram, a solo case plays end to end with Dex and shows up on the profile as rated.
 - Done checks pass.
 
 ## Out of scope

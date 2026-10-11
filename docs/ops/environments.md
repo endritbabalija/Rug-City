@@ -1,24 +1,30 @@
 # Environments
 
-Three environments, one codebase. Background: `Architecture.md`, decision G.
+One codebase, one Supabase project. Background: `Architecture.md`, decision G.
 
-| | Local | Staging | Production |
+While there are no real players, preview deploys and production share the **same Supabase project**. A second (staging) project is added only once real players are in and a risky change needs a safe place to test.
+
+| | Local | Preview | Production |
 | --- | --- | --- | --- |
-| Store | In-memory (no Supabase vars) | Staging Supabase project | Production Supabase project |
-| Telegram bot | None (`DEV_AUTH=1`) | Staging bot | Rug City bot |
+| Store | In-memory (no Supabase vars) | The Supabase project | The Supabase project |
+| Telegram bot | None (`DEV_AUTH=1`) | Optional test bot pointed at the branch URL | Production bot |
 | Deploys from | `npm run dev` | Vercel Preview (every branch) | `main` |
 | Env vars | `.env.local` | Vercel → Preview | Vercel → Production |
-| Feature flags | `FLAGS=a,b` | `feature_flags` table | `feature_flags` table |
+| Feature flags | `FLAGS=a,b` | `feature_flags` table (shared) | `feature_flags` table (shared) |
 | Sentry | Off (no DSN) | On, environment `preview` | On, environment `production` |
 
 Every variable is listed in `.env.example`.
 
+## Rules for sharing one database
+
+- **Migrations only add.** New tables, new nullable or defaulted columns, new indexes, new functions. Never drop, rename or change the meaning of anything the code on `main` still uses. A removal waits until the code that used it has been on `main` for one release, then ships as its own migration.
+- **Flags are shared.** Turning a flag on affects previews and production together. While there are no real players that's fine; afterwards, test with `FLAGS` locally first.
+- **Back up before data scripts.** Before a backfill or any script that rewrites rows, take a backup (Supabase → Database → Backups, or export the tables).
+- **Wipe test data at launch.** Before the Rug City launch, clear test players, rooms, results and events (see `docs/phase-1/11-launch.md`).
+
 ## Region
 
-Put the Vercel functions in the same region as the Supabase database. Every API call makes several database round trips, so a cross-region hop is paid many times per request.
-
-1. Pick the Supabase region when creating the project (it can't be changed later). Use the same region for staging and production.
-2. In Vercel → Project → Settings → Functions → Function Region, pick the matching region (e.g. Supabase `eu-central-1` Frankfurt ↔ Vercel `fra1`).
+Put the Vercel functions in the same region as the Supabase database. Every API call makes several database round trips, so a cross-region hop is paid many times per request. In Vercel → Project → Settings → Functions → Function Region, pick the region matching Supabase (e.g. Supabase `eu-central-1` Frankfurt ↔ Vercel `fra1`).
 
 ## Local
 
@@ -30,44 +36,41 @@ npm run dev
 - No Supabase vars: the in-memory store. Data is lost on restart.
 - `DEV_AUTH=1`: play in a normal browser as fake users (`/?dev=1&name=Ana`). Ignored in production builds.
 - `FLAGS=solo,daily` forces those flags on. Every other flag is off.
-- Events go to the in-memory store and are dropped on restart.
-- To test against a real database locally, point the Supabase vars at the **staging** project, never production.
+- With the Supabase vars set, local dev uses the shared project. That's fine for now; keep `DEV_AUTH` test users on ids that can't be real Telegram ids (e.g. 1–999).
 
-## Staging
+## Preview
 
-A full copy of production with its own data and bot, so a branch can be played inside Telegram before it merges.
+Every pushed branch gets a Preview deploy on the shared database.
 
 **One-time setup**
 
-1. **Supabase:** create a second project (e.g. `rug-city-staging`) in the production region. Apply every migration (below).
-2. **Bot:** create a staging bot in @BotFather and register its Mini App with `/newapp`, pointing at the staging URL.
-3. **Vercel → Settings → Environment Variables → Preview:** set the staging values of every variable in `.env.example`: the staging Supabase URL and keys, the staging bot token, username and Mini App short name, `TELEGRAM_WEBHOOK_SECRET`, `ADMIN_TELEGRAM_IDS`, `ANTHROPIC_API_KEY`, `SENTRY_DSN` and `NEXT_PUBLIC_SENTRY_DSN`. Leave `DEV_AUTH` and `FLAGS` unset.
-4. **A fixed staging URL:** Preview deploys get a new URL per commit, but a bot needs one URL. Assign a domain to a branch (Vercel → Settings → Domains, e.g. `staging.<domain>` → branch `staging`), or point the Mini App at the branch URL (`<project>-git-<branch>-<team>.vercel.app`) of the branch under test. Set `APP_URL` to it.
-5. Register the webhook and commands for the staging bot: put the staging `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET` and `APP_URL` in `.env.local` and run `npm run bot:setup`.
+1. **Vercel → Settings → Environment Variables:** tick **Preview** on `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY` and `ADMIN_TELEGRAM_IDS` (same values as Production). Leave `DEV_AUTH` and `FLAGS` unset.
+2. **Optional test bot,** to play a branch inside Telegram: create a bot in @BotFather, register its Mini App with `/newapp` pointing at the branch URL (`<project>-git-<branch>-<team>.vercel.app`), and set its `TELEGRAM_BOT_TOKEN`, `NEXT_PUBLIC_BOT_USERNAME`, `NEXT_PUBLIC_APP_SHORT_NAME`, `TELEGRAM_WEBHOOK_SECRET` and `APP_URL` for Preview only. Without a test bot, check branches locally and merge to try them in the production bot.
 
-**Checking a branch:** push it, wait for the Preview deploy, open the staging bot in Telegram. Turn on the slice's flag in the staging `feature_flags` table.
+**Checking a branch:** apply its new migration (below), push the branch, wait for the Preview deploy, open it through the test bot. Turn on the slice's flag in `feature_flags`.
 
 ## Production
 
 - Deploys from `main`. `main` only takes green PRs (CI: typecheck, lint, tests, build).
 - Vercel → Environment Variables → Production holds the production values. `DEV_AUTH` and `DEV_MIN_PLAYERS` are ignored there anyway.
-- Migrations and flags go to staging first, then production.
 
 ## Migrations
 
-Files in `supabase/migrations/`, numbered `000N_<name>.sql`, applied in order, never edited after merge. Each is written to be safe to run twice (`create … if not exists`).
+Files in `supabase/migrations/`, numbered `000N_<name>.sql`, applied in order, never edited after merge. Each is written to be safe to run twice (`create … if not exists`) and, under the rules above, only adds.
 
-Apply to **staging first**, check the branch there, then apply to production after the PR merges. Either:
+Apply a slice's migration when you start testing its branch (it only adds, so the code on `main` keeps working). Either:
 
 - **SQL editor:** Supabase dashboard → SQL Editor → paste the file → Run.
 - **Supabase CLI:** `supabase link --project-ref <ref>` then `supabase db push`.
+
+Applied so far: `0001`, `0002`. **Pending: `0003_events_flags.sql`.** Update this line when you apply one.
 
 ## Feature flags
 
 New player-facing features ship off and are checked with `flag('<name>')` (`lib/flags.ts`). The list of flags is in `docs/phase-1/DEFAULTS.md`. A missing row means off. Each server instance caches the table for 30 s, so a change takes up to 30 s to apply.
 
 ```sql
--- Turn a flag on (staging first)
+-- Turn a flag on
 insert into feature_flags (name, enabled, note, updated_at)
 values ('solo', true, 'testing slice 3', now())
 on conflict (name) do update set enabled = excluded.enabled, note = excluded.note, updated_at = now();

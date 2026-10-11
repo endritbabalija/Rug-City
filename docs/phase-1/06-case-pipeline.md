@@ -34,7 +34,7 @@ AI drafts new Memecoin Swamp cases in the `CaseFile` format, a blind solver reje
 
 ## Done when
 
-- 12 drafted cases are in `review` on staging, each with a solver report.
+- 12 drafted cases are in `review` in the database, each with a solver report.
 - An admin can playtest and approve a case, and it appears in Memecoin Swamp at its release time.
 - Done checks pass.
 

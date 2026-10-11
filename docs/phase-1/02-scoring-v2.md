@@ -38,7 +38,7 @@ The v2 rank ladder; every finished case is rated (solo and crew); help lowers th
 
 ## Done when
 
-- A case finished on staging with a Trace shows the penalty on the verdict screen and still counts on the leaderboard.
+- A case finished on a preview deploy with a Trace shows the penalty on the verdict screen and still counts on the leaderboard.
 - Done checks pass.
 
 ## Out of scope

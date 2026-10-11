@@ -28,7 +28,7 @@ New players get 3 free cases on their first day, and their first case doubles as
 
 ## Done when
 
-- A fresh staging account sees "Start here", gets tips through its first case, and has 2 free cases left that day.
+- A fresh test account sees "Start here", gets tips through its first case, and has 2 free cases left that day.
 - Done checks pass.
 
 ## Out of scope

@@ -31,7 +31,7 @@ Cases live in the database with a district and a release time, and Home becomes 
 
 ## Done when
 
-- On staging, the map shows one open and two locked districts, and both teasers can be played.
+- On a preview deploy, the map shows one open and two locked districts, and both teasers can be played.
 - Done checks pass.
 
 ## Out of scope

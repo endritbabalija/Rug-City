@@ -28,7 +28,7 @@ Two friends plus Dex can play a crew case. Dex fills one seat, shares his clues 
 
 ## Done when
 
-- On staging, two accounts plus Dex finish a case.
+- On a preview deploy, two accounts plus Dex finish a case.
 - Done checks pass.
 
 ## Out of scope

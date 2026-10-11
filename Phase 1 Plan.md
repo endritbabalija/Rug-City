@@ -16,16 +16,16 @@ Phase 1 fixes the two biggest gaps: a player can play alone, and has a reason to
 
 ## How we work
 
-- **One slice at a time.** Each slice is one branch and one PR, merged only with CI green and after a test on staging.
+- **One slice at a time.** Each slice is one branch and one PR, merged only with CI green and after a test on a preview deploy.
 - **Behind a flag.** New features ship switched off and are turned on per environment, so `main` is always releasable.
 - **Rules stay pure.** New rules go into pure functions with unit tests first; routes and UI come after.
-- **Done means:** tests pass, typecheck passes, it works on staging inside Telegram, and the events it needs are logged.
+- **Done means:** tests pass, typecheck passes, it works on a preview deploy, and the events it needs are logged.
 
 ## Overview
 
 | # | Slice | Game design | Architecture it brings in |
 | --- | --- | --- | --- |
-| 0 | Foundation | — | CI, staging, Sentry, events table, feature flags (G, F) |
+| 0 | Foundation | — | CI, preview deploys, Sentry, events table, feature flags (G, F) |
 | 1 | Data model | — | Typed player tables, `case_results`, `seasons`, `room_chats`, backfill (B) |
 | 2 | Scoring v2 | Rank ladder, every case rated, help penalties, target times | `case_stats` |
 | 3 | Solo with Dex | Solo cases, Dex as partner | AI seats, room sync fix (A) |
@@ -42,21 +42,21 @@ Phase 1 fixes the two biggest gaps: a player can play alone, and has a reason to
 
 **Builds**
 - GitHub Actions: typecheck, lint, tests and build on every push and PR.
-- Staging: a second Supabase project, a staging Telegram bot, Vercel preview deploys wired to them.
+- Preview deploys on the one Supabase project (no separate staging project until real players arrive; see `docs/ops/environments.md`).
 - Sentry on client and server, tagged with room code and player id.
 - `events` table and a `track(name, playerId, props)` helper. First events: `app_open`, `case_start`, `case_finish`, `purchase`, `invite_joined`, `ai_call`.
 - `feature_flags` table and a `flag(name)` helper with a short in-memory cache.
 
-**Tests:** events and flags work against the in-memory store and staging.
+**Tests:** events and flags work against the in-memory store.
 
-**Needs from you:** create the staging bot in BotFather; pick the Supabase plan and region.
+**Needs from you:** pick the Supabase plan and region.
 
 ## 1 · Data model
 
 **Builds**
 - Typed `players` columns for profile, inventory and counters; `player_badges`; `case_results` (one row per player per finished case); `seasons` (start and end per season, replacing the fixed 8-week math); `room_chats` (suspect chats out of the room document).
 - `Store` interface and the in-memory store updated to match.
-- One-off backfill script from `players.doc`, run on staging first. `doc` stays for one release as a fallback, then is dropped.
+- One-off backfill script from `players.doc`, run after a backup on the shared database. `doc` stays for one release as a fallback, then is dropped.
 - Season 1 end date set in the `seasons` table, plus the in-app countdown banner (both easy to change later).
 
 **Tests:** existing engine, progress and flow tests pass unchanged; a backfill test turns sample old documents into the new rows.
@@ -174,7 +174,7 @@ Phase 1 fixes the two biggest gaps: a player can play alone, and has a reason to
 
 | When | What |
 | --- | --- |
-| Before slice 0 | Staging bot, Supabase plan and region |
+| Before slice 0 | Supabase plan and region |
 | Slice 6 onward | Review and play drafted cases |
 | Before slice 11 | Secure the name, launch announcement |
 | Any time | Answer the open questions in each slice before it starts |

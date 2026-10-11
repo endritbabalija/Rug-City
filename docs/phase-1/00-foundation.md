@@ -55,7 +55,7 @@ CI, staging, error tracking, product events and feature flags, so every later sl
 ## Done when
 
 - CI is green on the PR.
-- On staging, opening the app writes an `app_open` row and a test error shows up in Sentry.
+- On a preview deploy, opening the app writes an `app_open` row and a test error shows up in Sentry.
 - Done checks in `CONVENTIONS.md` pass.
 
 ## Out of scope

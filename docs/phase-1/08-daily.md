@@ -31,7 +31,7 @@
 
 ## Done when
 
-- On staging, an approved puzzle plays, scores, extends the streak and shares.
+- On a preview deploy, an approved puzzle plays, scores, extends the streak and shares.
 - Done checks pass.
 
 ## Out of scope

@@ -39,7 +39,7 @@ A simple job queue and scheduled tasks: room cleanup, weekly median solve times,
 
 ## Done when
 
-- On staging, `tick` runs on schedule and a `/broadcast` reaches the test accounts.
+- On a preview deploy, `tick` runs on schedule and a `/broadcast` reaches the test accounts.
 - Done checks pass.
 
 ## Out of scope

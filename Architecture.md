@@ -121,14 +121,16 @@ The live room stays one JSON document. It is small, short-lived and fits compare
 
 | Environment | Store | Telegram bot | Deploys from |
 | --- | --- | --- | --- |
-| Local | In-memory (or a local Supabase) | None (`DEV_AUTH`) | `npm run dev` |
-| Staging | Separate Supabase project | Separate staging bot | Vercel preview deploys of every branch |
-| Production | Production Supabase project | Rug City bot | `main` |
+| Local | In-memory | None (`DEV_AUTH`) | `npm run dev` |
+| Preview | The one Supabase project | Optional test bot | Vercel preview deploys of every branch |
+| Production | The one Supabase project | Rug City bot | `main` |
 
+- **One Supabase project** until real players arrive: previews and production share it. A separate staging project is added only when real player data needs protecting from a risky change. Details: `docs/ops/environments.md`.
 - **CI (GitHub Actions)** on every push and PR: typecheck, lint, tests, build. `main` only takes green PRs.
-- **Migrations** only through `supabase/migrations`, applied to staging first, then production.
+- **Migrations** only through `supabase/migrations`, and they **only add** (no drops or renames of anything `main` still uses), so a branch's newer schema never breaks production on the shared database.
 - **Feature flags:** a small config table, so unfinished or undecided features (most of v2 is still open) ship switched off and turn on without a deploy.
-- Integration tests keep running against the in-memory store; a smaller set runs against staging Supabase before a release.
+- **Test data is wiped at launch**, so Rug City starts on a clean database.
+- Integration tests keep running against the in-memory store.
 
 ## AI
 
@@ -150,7 +152,7 @@ Every AI call logs tokens and cost as an `ai_call` event, so cost per session is
 
 ## Build order
 
-1. **Foundation:** CI, staging (Supabase project, bot, previews), Sentry, events table. (G, F)
+1. **Foundation:** CI, preview deploys, Sentry, events table. (G, F)
 2. **Room sync fix.** (A)
 3. **Data model migration** with backfill. (B)
 4. **With the Phase 1 features that need them:** cases in Postgres and the pipeline (C), job table and cron (D), rate limits and solve-time checks (E).

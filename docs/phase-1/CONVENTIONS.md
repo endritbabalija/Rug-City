@@ -19,7 +19,7 @@ Rules every agent follows when building a Phase 1 slice. When a brief and this f
 
 ## Data
 
-8. **Migrations** go in `supabase/migrations/000N_<name>.sql`, numbered in order, never edited after merge. RLS on with no policies (only the server, with the secret key, can read or write). Apply to staging before production.
+8. **Migrations** go in `supabase/migrations/000N_<name>.sql`, numbered in order, never edited after merge. RLS on with no policies (only the server, with the secret key, can read or write). **Migrations only add** while previews and production share one database: never drop, rename or change the meaning of anything the code on `main` still uses; removals ship later as their own migration (`docs/ops/environments.md`).
 9. **Feature flags.** New player-facing features check `flag('<name>')` (added in slice 0) and ship switched off.
 10. **Events.** Call `track()` (added in slice 0) for every event a brief lists. It never throws and never blocks the response.
 
@@ -35,7 +35,7 @@ Rules every agent follows when building a Phase 1 slice. When a brief and this f
 ## Done checks
 
 14. `npm run typecheck && npm run lint && npm test && npm run build` all pass (`lint` exists from slice 0 on).
-15. The feature works on staging inside Telegram, with its flag switched on there.
+15. The feature works on a preview deploy (inside Telegram through the test bot, or locally if there is none), with its flag switched on.
 16. New env vars are in `.env.example`; `README.md` is updated when setup changes.
 17. The status table in `docs/phase-1/README.md` is updated.
 

@@ -26,6 +26,7 @@ To change one before its slice starts, edit this file. After the slice is merged
 | Seasons | S1 Oct 5–Nov 2, S2 Nov 2–30, S3 Nov 30–Dec 28 (2026), then 8 weeks each from S4 | `seasons` table seed | 1 |
 | Admin screen | Inside the Mini App, only shown to `ADMIN_TELEGRAM_IDS` | `components/admin/*` | 6 |
 | Cron runner | Vercel Cron if on Vercel Pro; otherwise Supabase `pg_cron` + `pg_net` calling the same routes | `vercel.json` or a migration | 10 |
+| Environments | One Supabase project shared by previews and production until real players arrive; migrations only add; test data wiped at launch | `docs/ops/environments.md` | all |
 | Brand | Rug City; "Who rugged?" stays as the hook line and the Daily's name | `lib/brand.ts` | 11 |
 
 ## Feature flags

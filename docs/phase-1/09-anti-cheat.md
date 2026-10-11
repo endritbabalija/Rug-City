@@ -29,7 +29,7 @@ Rate limits on every costly or farmable route, too-fast finishes caught, and a h
 
 ## Done when
 
-- On staging, hammering suspect chat returns 429, and a scripted fast finish is unrated.
+- On a preview deploy, hammering suspect chat returns 429, and a scripted fast finish is unrated.
 - Done checks pass.
 
 ## Out of scope

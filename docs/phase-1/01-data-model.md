@@ -36,7 +36,7 @@ Move player progress out of the `players.doc` JSON into typed tables, move suspe
 5. **Chats.** The room keeps `questionsUsed` and `subpoenas` and gains `awaiting: Record<chatKey, true>`, which replaces the "last message is from the player" check in `askSuspect`. `askSuspect` / `suspectReply` / `refundQuestion` in `engine.ts` update `awaiting` and counters only; `ask` in `lib/rooms.ts` writes and deletes `room_chats` rows. `buildView` takes the player's chats as an argument.
 6. **Badges and rewards.** `applyGrant` returns the badge to add or remove instead of editing an array; payments, refunds and season rewards call the store.
 7. **Season banner.** On Home, behind flag `season_banner`: "Season N ends in X days".
-8. **Backfill `scripts/backfill-v2.mjs`.** Reads every `players.doc` and fills the new columns, `player_badges`, `season_rewards`, and `case_results` rows rebuilt from `recent` (use room code `legacy-<caseId>` and mark them so they can't collide). Idempotent; prints a summary. Run on staging first. `doc` is dropped by a later migration after one release.
+8. **Backfill `scripts/backfill-v2.mjs`.** Reads every `players.doc` and fills the new columns, `player_badges`, `season_rewards`, and `case_results` rows rebuilt from `recent` (use room code `legacy-<caseId>` and mark them so they can't collide). Idempotent; prints a summary. Take a backup first. Because previews and production share one database (`docs/ops/environments.md`), production keeps reading `doc` while the branch is tested: run the backfill once to test, and again right after merging. `doc` is dropped by a later migration after one release.
 
 ## Reuse
 
@@ -55,7 +55,7 @@ Move player progress out of the `players.doc` JSON into typed tables, move suspe
 
 ## Done when
 
-- Staging runs on the new tables after the backfill, and an old player's points, badges and recent cases look the same.
+- A preview deploy runs on the new tables after the backfill, and an old player's points, badges and recent cases look the same.
 - Done checks pass.
 
 ## Out of scope
@@ -64,4 +64,4 @@ Move player progress out of the `players.doc` JSON into typed tables, move suspe
 
 ## Needs from Endrit
 
-- OK to run the backfill on staging, then production.
+- OK to run the backfill (after a backup) on the shared database.
