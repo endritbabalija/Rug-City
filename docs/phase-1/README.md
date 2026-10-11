@@ -45,7 +45,7 @@ Agents update this table at the end of each session.
 
 | # | Status | Branch | PR | Notes |
 | --- | --- | --- | --- | --- |
-| 0 | Merged | `phase1/00-foundation` | [#1](https://github.com/endritbabalija/Rug-City/pull/1) | CI green; events checked on a local dev server. Sentry DSN set locally and in Vercel; Vercel linked to GitHub. Still to do: apply `0003` in the Supabase SQL editor, tick Preview on the Supabase env vars, check `app_open` and a test error in production |
+| 0 | Done | `phase1/00-foundation` | [#1](https://github.com/endritbabalija/Rug-City/pull/1) | `0003` applied; Supabase vars on Preview; production writes `app_open`; a test error reached Sentry. Known issue: `who-rugged-blond.vercel.app` is unreachable from some networks (Endrit's home Wi-Fi); a custom domain fixes it, before launch |
 | 1 | Not started | | | |
 | 2 | Not started | | | |
 | 3 | Not started | | | |
