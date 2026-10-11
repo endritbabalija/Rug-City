@@ -66,7 +66,9 @@ Each case is a draft plus about 40 solver calls, and up to 2 revisions when the 
 | Group play | `components/phases/Lobby.tsx`, webhook `/play` | Invites are direct Mini App links (`t.me/<bot>/<app>?startapp=<code>`) that work in groups; opening one auto-joins the lobby. |
 | Native chrome | `lib/telegram/webapp.ts` | BackButton, haptics, closing confirmation mid-case, vertical swipes off, header and background colors set. |
 
-## Game design notes
+## Legacy game design notes
+
+How the earlier crew game works. The Refund is built separately (see `Rug City — The Refund Brief.md`).
 
 - **Cases are data** (`lib/cases/*.ts`) and stay on the server. Players only ever receive their own projection (`lib/game/view.ts`): their clues, their suspect chats, and shared explorer data. Hidden funding sources stay masked until someone uses Trace.
 - **Clue split**: clues are dealt round-robin in each case's `dealOrder`. `tests/cases.test.ts` checks, for 3, 4, 5 and 6 players, that no single player ever holds a complete proof of the culprit. It's a static stand-in for the doc's blind-solver gate.

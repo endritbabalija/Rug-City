@@ -10,6 +10,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Rug City
 
-- **Direction:** `Rug City — Game Direction.md` is where the game is going: a story-led detective adventure, starting with The Refund (solo), specified in `Rug City — The Refund Brief.md`. The code still runs the earlier crew game; don't remove or migrate old systems without an explicit task.
+- **Direction (decided 2026-10-11):** Rug City has pivoted to `Rug City — Game Direction.md`: a story-led detective adventure. Chapter 1, The Refund (solo), is specified in `Rug City — The Refund Brief.md`.
+- **Current task:** build The Refund. Start from the kickoff prompt in section 12 of the brief.
+- **Legacy code:** the code still runs the earlier crew game (votes, ranks, districts, shop, AI case pipeline). The Refund is built beside it behind the `refund_prototype` flag; don't remove or migrate legacy systems without an explicit task.
 - **Coding rules:** `docs/CONVENTIONS.md`. Environments (one shared Supabase project, preview deploys): `docs/ops/environments.md`.
-- **Archive:** `docs/archive/` holds the old concept, Game Design v2, Phase 1 Plan and slice briefs. Use them to understand existing code, not as requirements.
+- **Archive:** `docs/archive/` holds the old concept, Game Design v2, Phase 1 Plan and slice briefs. Use them to understand legacy code, not as requirements.

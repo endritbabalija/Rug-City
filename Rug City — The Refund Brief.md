@@ -4,17 +4,19 @@
 
 Prepared 11 October 2026. Design baseline: endritbabalija/Rug-City, main reviewed through 930b94dce1e70cf0c09c0971eb3233294c29917e (PR #10). Inspect current HEAD before implementation; do not reset or overwrite newer work.
 
-**Status:** proposed implementation specification approved for handoff through the conversation. This file does not claim the prototype is implemented or playtested. Names, dialogue and values below are authored fictional content for this experiment.
+**Status:** approved implementation specification. This file does not claim the case is implemented or playtested. Names, dialogue and values below are authored fictional content.
+
+**Decision (11 Oct 2026):** Rug City is pivoting to the direction in `Rug City — Game Direction.md`. The Refund is chapter 1 of the new game, not a side experiment. The earlier design is archived in `docs/archive/`.
 
 # 1. Task and intended outcome
 
 Build one complete solo investigation in the existing Telegram Mini App. It must demonstrate: inspect evidence, connect facts, challenge a specific lie, gain new evidence, and submit a supported accusation. The central experience is catching someone in a lie without assuming that every liar is the thief.
 
-The player should feel that their reasoning changes the investigation. Test an 8–12 minute first playthrough, without forcing that duration or imposing a countdown. This is an experiment in moment-to-moment play, not a commitment to a complete product pivot.
+The player should feel that their reasoning changes the investigation. Test an 8–12 minute first playthrough, without forcing that duration or imposing a countdown. Whether the moment-to-moment play works is still unproven until observed playtests (section 11).
 
-Read `AGENTS.md`, `docs/CONVENTIONS.md`, `docs/archive/phase-1/DEFAULTS.md`, and the relevant installed Next.js guides before writing code. Preserve the conventions on pure rules, store parity, server authority, validation and additive migrations. This is a separate prototype, not the next existing Phase 1 slice. Historical roadmap features are not requirements for this task.
+Read `AGENTS.md`, `docs/CONVENTIONS.md`, `docs/ops/environments.md`, and the relevant installed Next.js guides before writing code. Preserve the conventions on pure rules, store parity, server authority, validation and additive migrations. The old Phase 1 plan is archived; its features are not requirements for this task.
 
-Use a new local branch such as `prototype/the-refund`. Implement and verify locally. Follow repository permission rules for committing. Do not merge, deploy, change shared flags, run shared-database migrations, or repoint the preview as part of this handoff. Prepare any needed additive migration and report deployment steps separately. These limits keep the experiment separate from the current live game.
+Use a new branch such as `refund/the-refund`. Implement and verify locally first. Follow repository rules for committing (`docs/CONVENTIONS.md`): one PR into `main`, merged only when Endrit asks. Migrations are additive and are applied to the shared database, the preview repointed and the `refund_prototype` flag switched on only when Endrit asks to test, following `docs/ops/environments.md`. The legacy crew game keeps working beside the new case until a separate task removes it.
 
 ## In scope
 
@@ -246,7 +248,7 @@ Minimal actions: start/resume, open topic, submit finding, confront, request hin
 
 Projection contains discovered evidence, established findings, visible statements/topics, transcript and available interaction options. Withhold answer tables, undiscovered records, full source scripts and future narrative. On successful unlock return new projected state; rejected guessed IDs must not leak undiscovered content.
 
-Reuse Telegram authentication, dev auth, route/error helpers and zod schemas. This prototype makes no AI API calls. Do not add provider keys or packages merely for dialogue. Feature gating must happen on server endpoints as well as navigation. In local dev `FLAGS=refund_prototype` enables the experiment; no shared flags are changed.
+Reuse Telegram authentication, dev auth, route/error helpers and zod schemas. This prototype makes no AI API calls. Do not add provider keys or packages merely for dialogue. Feature gating must happen on server endpoints as well as navigation. In local dev `FLAGS=refund_prototype` enables the case; the shared flag stays off until Endrit asks.
 
 ## Analytics
 

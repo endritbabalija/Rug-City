@@ -4,6 +4,8 @@
 
 Version 0.1 · 11 October 2026 · Planning companion for Claude
 
+**Decision (11 Oct 2026):** Endrit has chosen this direction for Rug City. The earlier design (concept, Game Design v2, Phase 1 Plan) is archived in `docs/archive/` and is no longer a requirement. Player validation is still ahead: the cautions below about untested assumptions still apply.
+
 # 0. Read this first
 
 This pack captures the product direction agreed during discussion and develops four proposed case outlines. It is not an instruction to build all of them. None of the proposed interactions, pacing or commercial assumptions has been validated with players.
@@ -22,7 +24,7 @@ Repository baseline previously reviewed: endritbabalija/Rug-City, commit 930b94d
 | Deferred | Three or more players, progression overhaul, paid story arcs, broader campaign and relationship systems |
 | Parked | The Mole, cash prizes, competitive speed rankings, idle informants and construction timers |
 
-Preserve repository engineering conventions and access controls. Old product documents describe the legacy design; do not silently treat every old feature as a requirement for this experiment. Explain genuine conflicts. Do not rewrite existing roadmap or architecture documents as though a full pivot were already validated.
+Preserve repository engineering conventions and access controls. Old product documents (now in `docs/archive/`) describe the legacy design; do not treat any old feature as a requirement. Explain genuine conflicts.
 
 # 1. The experience we want
 
@@ -423,6 +425,6 @@ Read this Game Direction and Case Design Pack and the separate Refund build brie
 
 The Refund is the only case to build now. The four later cases describe future reasoning tasks and narrative continuity so you avoid hardcoding every case as the same compare/confront loop. Do not implement those future systems pre-emptively.
 
-Inspect current main and engineering instructions. Explain what you can reuse, what Refund needs and what stays separate. Build the isolated solo prototype exactly within its scope, document its architecture and run the required checks. Preserve the existing game and do not merge, deploy or change shared data as part of this task. Flag genuine contradictions rather than silently inventing story facts.
+Inspect current main and engineering instructions. Explain what you can reuse, what Refund needs and what stays separate. Build the isolated solo prototype exactly within its scope, document its architecture and run the required checks. Keep the existing game working beside it and follow the brief's rules for merging, deploying and shared data. Flag genuine contradictions rather than silently inventing story facts.
 
-This pack does not replace the detailed Refund brief, broaden its implementation permission or claim a final product pivot. If Refund is already being built, use this as context and document extension points; do not restart it merely to design a framework.
+This pack does not replace the detailed Refund brief or broaden its implementation permission. If Refund is already being built, use this as context and document extension points; do not restart it merely to design a framework.
