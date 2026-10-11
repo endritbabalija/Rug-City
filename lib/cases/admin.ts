@@ -7,7 +7,7 @@ import { resetCaseCache } from './index'
 import { caseSchema } from './schema'
 import type { CaseFile } from './types'
 
-// Admin review of stored cases (docs/phase-1/06-case-pipeline.md). Routes check the
+// Admin review of stored cases (docs/archive/phase-1/06-case-pipeline.md). Routes check the
 // caller is an admin before calling these.
 
 type StoredCase = CaseFile & { review?: CaseReview }

@@ -1,6 +1,6 @@
 # Environments
 
-One codebase, one Supabase project. Background: `Architecture.md`, decision G.
+One codebase, one Supabase project. Background: `docs/archive/Architecture.md`, decision G.
 
 While there are no real players, preview deploys and production share the **same Supabase project**. A second (staging) project is added only once real players are in and a risky change needs a safe place to test.
 
@@ -20,7 +20,7 @@ Every variable is listed in `.env.example`.
 - **Migrations only add.** New tables, new nullable or defaulted columns, new indexes, new functions. Never drop, rename or change the meaning of anything the code on `main` still uses. A removal waits until the code that used it has been on `main` for one release, then ships as its own migration.
 - **Flags are shared.** Turning a flag on affects previews and production together. While there are no real players that's fine; afterwards, test with `FLAGS` locally first.
 - **Back up before data scripts.** Before a backfill or any script that rewrites rows, take a backup (Supabase → Database → Backups, or export the tables).
-- **Wipe test data at launch.** Before the Rug City launch, clear test players, rooms, results and events (see `docs/phase-1/11-launch.md`).
+- **Wipe test data at launch.** Before the Rug City launch, clear test players, rooms, results and events (see `docs/archive/phase-1/11-launch.md`).
 
 ## Region
 
@@ -76,7 +76,7 @@ Applied so far: `0001`–`0006` (`scripts/backfill-v2.mjs` was run after `0004`)
 
 ## Feature flags
 
-New player-facing features ship off and are checked with `flag('<name>')` (`lib/flags.ts`). The list of flags is in `docs/phase-1/DEFAULTS.md`. A missing row means off. Each server instance caches the table for 30 s, so a change takes up to 30 s to apply.
+New player-facing features ship off and are checked with `flag('<name>')` (`lib/flags.ts`). The list of flags is in `docs/archive/phase-1/DEFAULTS.md`. A missing row means off. Each server instance caches the table for 30 s, so a change takes up to 30 s to apply.
 
 ```sql
 -- Turn a flag on

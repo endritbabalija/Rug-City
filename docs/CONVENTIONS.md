@@ -1,6 +1,6 @@
 # Conventions
 
-Rules every agent follows when building a Phase 1 slice. When a brief and this file disagree, ask.
+Rules every agent follows when writing code here. When a brief and this file disagree, ask.
 
 ## Code
 
@@ -14,7 +14,7 @@ Rules every agent follows when building a Phase 1 slice. When a brief and this f
 3. **Store parity.** All data access goes through the `Store` interface in `lib/store/types.ts`, implemented in **both** `lib/store/memory.ts` and `lib/store/supabase.ts`. Tests and local dev run on the memory store.
 4. **Server decides.** Hidden case data (answers, suspect truths and lies, other players' clues) never reaches the client. Every response goes through a projection like `buildView` in `lib/game/view.ts`.
 5. **Idempotent rewards.** Points, items, results and jobs must be safe to run twice: unique keys, plus the claim-then-act pattern in `settleAfter` (`lib/rooms.ts`).
-6. **Provisional values** come from the constant named in `DEFAULTS.md`, never a literal in the code.
+6. **Provisional values** live in one named constant, never a literal in the code.
 7. **Match the surrounding code:** naming, comment density, small files, zod for request bodies, `route()` and `authenticate()` from `lib/server.ts` for every API route.
 
 ## Data
@@ -37,8 +37,7 @@ Rules every agent follows when building a Phase 1 slice. When a brief and this f
 14. `npm run typecheck && npm run lint && npm test && npm run build` all pass (`lint` exists from slice 0 on).
 15. The feature works on the branch's preview deploy inside Telegram, with its flag switched on: `npm run preview:point -- <branch>`, then open `t.me/WhoRuggedBot/preview` (`docs/ops/environments.md` → Preview). Do this before merging.
 16. New env vars are in `.env.example`; `README.md` is updated when setup changes.
-17. The status table in `docs/phase-1/README.md` is updated.
 
 ## Git
 
-18. One branch per slice, `phase1/NN-<slice>`, one PR into `main`. Commit only when asked. Never skip hooks.
+17. One branch per task, one PR into `main`. Commit only when asked. Never skip hooks.

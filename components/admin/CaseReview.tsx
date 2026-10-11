@@ -8,7 +8,7 @@ import { ClueCard } from '../evidence/ClueCard'
 import { useGame } from '../GameContext'
 import { Button, Label, Pill, Tape } from '../ui'
 
-// Admin-only case review (docs/phase-1/06-case-pipeline.md): read a drafted case and its
+// Admin-only case review (docs/archive/phase-1/06-case-pipeline.md): read a drafted case and its
 // solver report, playtest it for free, then approve it with a release time or reject it.
 
 const STATUSES = ['review', 'live', 'retired'] as const

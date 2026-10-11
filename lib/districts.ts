@@ -15,7 +15,7 @@ export interface District {
   skill: string
   /** Working name of the district's boss. */
   boss: string
-  /** Rank that opens the district (provisional, docs/phase-1/DEFAULTS.md → District unlocks). */
+  /** Rank that opens the district (provisional, docs/archive/phase-1/DEFAULTS.md → District unlocks). */
   unlockRank: RankTitle
   order: number
 }
