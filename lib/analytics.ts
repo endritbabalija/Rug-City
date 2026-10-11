@@ -3,7 +3,19 @@ import { after } from 'next/server'
 import { store } from './store'
 
 /** Every product event we record. Add a name here before tracking it. */
-export type EventName = 'app_open'
+export type EventName =
+  | 'app_open'
+  // The Refund (brief §9). Props are ids, flags and counts only: never dialogue or document text.
+  | 'investigation_started'
+  | 'investigation_resumed'
+  | 'evidence_opened'
+  | 'finding_attempted'
+  | 'finding_established'
+  | 'confrontation_attempted'
+  | 'confrontation_resolved'
+  | 'hint_requested'
+  | 'accusation_submitted'
+  | 'investigation_completed'
 
 /**
  * Record a product event in the `events` table. Inside a request the write runs after

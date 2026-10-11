@@ -15,7 +15,7 @@ describe('/api/me', () => {
   it('creates the player on first visit and returns only public fields', async () => {
     const res = await me('dev 7:Ana')
     expect(res.status).toBe(200)
-    expect(await res.json()).toEqual({ player: { id: 7, name: 'Ana' } })
+    expect(await res.json()).toEqual({ player: { id: 7, name: 'Ana' }, features: { refund: false } })
     expect((await store().getPlayer(7))?.name).toBe('Ana')
   })
 

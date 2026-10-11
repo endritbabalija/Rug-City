@@ -1,19 +1,24 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError, isTelegram } from '@/lib/client/api'
+import type { RunView } from '@/lib/investigation/view'
 import type { PublicPlayer } from '@/lib/server'
 import { initTelegram } from '@/lib/telegram/webapp'
 import { Home } from './Home'
+import { Investigation } from './investigation/Investigation'
 import { Tape } from './ui'
 
 interface MeResponse {
   player: PublicPlayer
+  features: { refund: boolean }
 }
 
 export function Game() {
   const [me, setMe] = useState<MeResponse | null>(null)
   const [bootError, setBootError] = useState<string | null>(null)
+  const [run, setRun] = useState<RunView | null>(null)
+  const goHome = useCallback(() => setRun(null), [])
 
   useEffect(() => {
     initTelegram()
@@ -44,7 +49,12 @@ export function Game() {
 
   return (
     <main className="safe-top safe-bottom mx-auto min-h-dvh max-w-xl">
-      <Home player={me.player} />
+      {run ? (
+        // Keyed by run so a restart or a different run starts with fresh screen state.
+        <Investigation key={run.runId} initial={run} onHome={goHome} />
+      ) : (
+        <Home player={me.player} refund={me.features.refund} onOpenRun={setRun} />
+      )}
     </main>
   )
 }
