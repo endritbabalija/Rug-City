@@ -42,6 +42,15 @@ Set `FLAGS=refund_prototype` to turn a feature flag on locally. CI (`.github/wor
    ```
    That registers the webhook (with the secret), the `/start` command and the chat menu button.
 
+## Playtest readout
+
+```bash
+npm run playtest:readout                       # The Refund runs active in the last 7 days
+npm run playtest:readout -- --since 2026-10-12 --player <telegram id>
+```
+
+Reads the shared Supabase project with the keys in `.env.local` (read-only). Prints one block per run, in the order things happened: records opened, people asked, wrong claims and challenges, hints, accusations, and the step an unfinished player stopped at. With more than one run it ends with a summary. Asking a topic is timed from the run itself; following a lead has no timestamp. Dev ids below 1000 are hidden unless you pass `--include-dev`.
+
 ## How the foundation works
 
 | Part | Where | Notes |
