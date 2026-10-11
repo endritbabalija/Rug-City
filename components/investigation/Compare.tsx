@@ -46,7 +46,7 @@ export function Compare({ run, initial, onClose, send }: { run: RunView; initial
       <div className="mt-2 space-y-2">
         {run.evidence.map((e) => (
           <Chip key={e.id} selected={selected.includes(e.id)} disabled={!selected.includes(e.id) && selected.length >= MAX_CARDS} onClick={() => toggle(e.id)}>
-            {e.title} <span className="font-mono text-xs text-dim">· {e.time}</span>
+            {e.title} <span className="font-mono text-xs whitespace-nowrap text-dim">· {e.time}</span>
           </Chip>
         ))}
       </div>

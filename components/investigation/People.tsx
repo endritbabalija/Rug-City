@@ -202,7 +202,7 @@ function ChallengeSheet({ run, statement, send, onClose }: { run: RunView; state
       <div className="mt-2 space-y-2">
         {run.evidence.map((e) => (
           <Chip key={e.id} selected={evidence.includes(e.id)} onClick={() => toggle(evidence, setEvidence, e.id)}>
-            {e.title} <span className="font-mono text-xs text-dim">· {e.time}</span>
+            {e.title} <span className="font-mono text-xs whitespace-nowrap text-dim">· {e.time}</span>
           </Chip>
         ))}
       </div>

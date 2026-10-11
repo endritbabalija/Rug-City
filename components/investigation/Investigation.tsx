@@ -161,14 +161,14 @@ export function Investigation({ initial, onHome }: { initial: RunView; onHome: (
       <header className="px-4 pt-5">
         <div className="flex items-baseline justify-between">
           <Label>Prototype · Chapter 1</Label>
-          <button type="button" onClick={reviewing ? () => setReviewing(false) : onHome} className="min-h-11 text-sm text-dim underline underline-offset-4">
+          <button type="button" onClick={reviewing ? () => setReviewing(false) : onHome} className="min-h-11 min-w-11 text-sm text-dim underline underline-offset-4">
             {reviewing ? 'Back to ending' : 'Home'}
           </button>
         </div>
         <h1 className="font-display text-4xl leading-none font-black uppercase">{run.title}</h1>
       </header>
 
-      <nav role="tablist" aria-label="Case sections" className="sticky top-0 z-30 mt-4 flex border-b border-line bg-ink px-2">
+      <nav role="tablist" aria-label="Case sections" className="sticky-safe-top z-30 mt-4 flex border-b border-line bg-ink px-2">
         {TABS.map((t) => (
           <button
             key={t.id}

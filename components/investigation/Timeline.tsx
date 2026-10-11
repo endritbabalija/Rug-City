@@ -63,7 +63,7 @@ export function Timeline({ run, onClose, send }: { run: RunView; onClose: () => 
           <li key={item.evidence} className="flex items-center gap-2 rounded-md border border-line bg-ink-2 p-2 pl-3">
             <span className="font-mono text-sm text-dim">{i + 1}.</span>
             <span className="flex-1 text-[15px]">
-              {item.label} <span className="font-mono text-xs text-dim">· {item.time}</span>
+              {item.label} <span className="font-mono text-xs whitespace-nowrap text-dim">· {item.time}</span>
             </span>
             <button type="button" aria-label={`Move ${item.label} up`} disabled={i === 0} onClick={() => move(i, -1)} className="h-11 w-11 rounded-md border border-line disabled:opacity-30">
               ↑
