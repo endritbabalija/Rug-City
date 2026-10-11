@@ -8,7 +8,7 @@ Version 0.1 · 11 October 2026 · Planning companion for Claude
 
 This pack captures the product direction agreed during discussion and develops four proposed case outlines. It is not an instruction to build all of them. None of the proposed interactions, pacing or commercial assumptions has been validated with players.
 
-Use with **Rug-City-The-Refund-Claude-Build-Brief.md**, the detailed implementation brief for prototype 01. That brief remains authoritative for The Refund's evidence, dialogue, prototype scope and implementation limits. This pack clarifies the broader direction, especially that The Refund must not become a rigid template for every case.
+Use with **`Rug City — The Refund Brief.md`**, the detailed implementation brief for prototype 01. That brief remains authoritative for The Refund's evidence, dialogue, prototype scope and implementation limits. This pack clarifies the broader direction, especially that The Refund must not become a rigid template for every case.
 
 Repository baseline previously reviewed: endritbabalija/Rug-City, commit 930b94dce1e70cf0c09c0971eb3233294c29917e. This is not a claim about current HEAD. Inspect current code before implementing. No repository files were changed to produce this pack.
 
