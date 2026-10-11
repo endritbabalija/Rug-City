@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "bot:setup": "node --env-file-if-exists=.env.local scripts/setup-bot.mjs",
+    "preview:point": "node scripts/point-preview.mjs",
     "lint": "eslint ."
   },
   "dependencies": {

@@ -17,7 +17,8 @@ Two friends plus Dex can play a crew case. Dex fills one seat, shares his clues 
 2. **Start.** With Dex seated, the minimum is `MIN_HUMANS_WITH_DEX` humans; seats = humans + `DEX_ID`. `mode` stays `crew`.
 3. **Clue release.** `dexReleased(state, now)` in `lib/game/dex.ts` (pure) returns which of Dex's clues are public, from `investigateStartedAt` and `DEX_RELEASE_SCHEDULE`. `buildView` shows released clues to every player and adds a feed line per release. No background job.
 4. **Hints in crews.** `askDex 'hint'` works for any player; the hint and Dex's line go to the group feed and apply the room-wide penalty.
-5. **UI** behind flag `dex_crew`: "Add Dex" in the lobby for the host; Dex's seat shown in the player list; released clues in a "Dex's notes" section.
+5. **Event `invite_sent`** (Architecture → F). Add it to `EventName`; record it with `{ code }` when the host taps the invite or share button in the lobby, through a room action `{ type: 'invited' }` that only tracks (it changes nothing in the room). Not behind the flag.
+6. **UI** behind flag `dex_crew`: "Add Dex" in the lobby for the host; Dex's seat shown in the player list; released clues in a "Dex's notes" section.
 
 ## Tests
 

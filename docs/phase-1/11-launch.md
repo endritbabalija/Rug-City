@@ -19,7 +19,8 @@ Rename to Rug City, start the new season with everything switched on, and have t
    - `v_case_completion`: `case_start` vs `case_finish`, by mode.
    - `v_ai_cost_per_session`: sum of `ai_call.costUsd` per finished case.
    - `v_mode_share`: solo vs crew finishes.
-3. **`docs/ops/launch.md`.** Checklist: secure name → `npm run bot:setup` with the new bot → env vars → apply migrations → backfill done → back up, then wipe test data from the shared database (players, rooms, chats, results, ratings, events; keep `cases`, `daily_puzzles`, `seasons`, `feature_flags`; refund or keep real Stars purchases first) → turn on flags `solo`, `dex_crew`, `districts`, `tutorial`, `daily` → check the new season row → `/broadcast` the launch message → watch Sentry and `v_retention`.
+   - `v_invites`: `invite_sent` per week, and how many `invite_joined` follow.
+3. **`docs/ops/launch.md`.** Checklist: secure name → `npm run bot:setup` with the new bot, and recreate the `preview` Mini App on it (`docs/ops/environments.md` → Preview) → env vars → apply migrations → backfill done → back up, then wipe test data from the shared database (players, rooms, chats, results, ratings, events; keep `cases`, `daily_puzzles`, `seasons`, `feature_flags`; refund or keep real Stars purchases first) → turn on flags `solo`, `dex_crew`, `districts`, `tutorial`, `daily` → check the new season row → `/broadcast` the launch message → watch Sentry and `v_retention`.
 4. **README.** Rename, update the run and deploy sections.
 
 ## Tests
