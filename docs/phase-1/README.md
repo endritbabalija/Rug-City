@@ -46,7 +46,7 @@ Agents update this table at the end of each session.
 | # | Status | Branch | PR | Notes |
 | --- | --- | --- | --- | --- |
 | 0 | Done | `phase1/00-foundation` | [#1](https://github.com/endritbabalija/Rug-City/pull/1) | `0003` applied; Supabase vars on Preview; production writes `app_open`; a test error reached Sentry. Known issue: `who-rugged-blond.vercel.app` is unreachable from some networks (Endrit's home Wi-Fi); a custom domain fixes it, before launch |
-| 1 | In review | `phase1/01-data-model` | [#2](https://github.com/endritbabalija/Rug-City/pull/2) | Code, tests and local check done (memory store, `season_banner` on). `0004` applied and backfill run on the shared database (4 players; backup in `../Who-Rugged-backups/`). Not yet done: check a preview deploy with an old player; run the backfill again right after merging. Leftover: preview-only players have `doc = null`, which the code on `main` can't read |
+| 1 | In review | `phase1/01-data-model` | [#2](https://github.com/endritbabalija/Rug-City/pull/2) | Code, tests and local check done (memory store, `season_banner` on). `0004` applied and backfill run on the shared database (4 players; backup in `../Who-Rugged-backups/`). CI and the Vercel preview build pass. No test bot, so checked the branch locally against the shared database instead: old player loads from the new columns; a full case with dev players 1, 4875 and 987654 wrote `case_results`, `room_chats`, points and season ratings; a replay stayed unrated. After merging: run the backfill again. Leftover: preview-only players have `doc = null`, which the code on `main` can't read |
 | 2 | Not started | | | |
 | 3 | Not started | | | |
 | 4 | Not started | | | |
