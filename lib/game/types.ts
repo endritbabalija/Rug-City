@@ -10,6 +10,8 @@ export const ACCUSE_GRACE_MS = 3 * 60 * 1000
 export const QUESTIONS_PER_PLAYER = 6
 /** Detective Dex's seat id. Telegram ids are positive, so it can't collide with a player. */
 export const DEX_ID = 0
+/** Humans a crew needs when Dex takes a seat. */
+export const MIN_HUMANS_WITH_DEX = 2
 
 export interface RoomPlayer {
   id: number
@@ -26,7 +28,7 @@ export interface ChatMessage {
   subpoena?: boolean
 }
 
-/** Something Dex said in a solo room: banter around a clue or hint he shared. */
+/** Something Dex said: banter around a clue or hint he shared. */
 export interface DexMessage {
   ask: 'clue' | 'hint'
   text: string
@@ -95,6 +97,8 @@ export interface RoomState {
   phase: Phase
   phaseStartedAt: number
   players: RoomPlayer[]
+  /** The host added Dex to this crew's lobby (crew rooms only; solo rooms always seat him). */
+  dexSeated?: boolean
   /** Seat order is fixed when the case starts and drives the clue deal. */
   seats: number[]
   /** key `${playerId}:${suspectId}` -> a question is waiting for its answer. The messages are `room_chats` rows. */
@@ -104,7 +108,7 @@ export interface RoomState {
   subpoenas: Record<string, boolean>
   traced: string[]
   hintsRevealed: number
-  /** Dex's clues he has shown the player, in order (rooms with Dex only). */
+  /** Dex's clues he has shown the player, in order (solo rooms; crews get his clues on a timer). */
   dexShared?: string[]
   dexMessages?: DexMessage[]
   /** Missing on rooms created before help penalties. */

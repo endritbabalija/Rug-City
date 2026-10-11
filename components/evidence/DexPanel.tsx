@@ -3,20 +3,24 @@
 import { useEffect, useRef, useState } from 'react'
 import { HELP_PENALTY } from '@/lib/game/scoring'
 import type { PhaseProps } from '../Room'
-import { Button } from '../ui'
+import { Button, Countdown, Label } from '../ui'
 import { ClueCard } from './ClueCard'
 
 const pct = (n: number) => `${Math.round(n * 100)}%`
 
-/** Detective Dex, the solo partner: he shows his clues one at a time and gives a couple of hints. */
-export function DexPanel({ room, run, busy }: PhaseProps) {
+/**
+ * Detective Dex. Solo, he shows his clues one at a time when asked; in a crew his notes go
+ * public on a timer. Either way anyone can ask him for a couple of hints.
+ */
+export function DexPanel({ room, run, busy, now }: PhaseProps) {
   const dex = room.dex!
+  const crew = room.mode === 'crew'
   const [confirmHint, setConfirmHint] = useState(false)
   const endRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
-  }, [dex.messages.length])
+    if (!crew) endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+  }, [crew, dex.messages.length])
 
   async function hint() {
     setConfirmHint(false)
@@ -26,7 +30,11 @@ export function DexPanel({ room, run, busy }: PhaseProps) {
   let clueIndex = 0
   return (
     <div className="px-4">
-      <p className="text-sm text-dim">Dex holds the rest of the evidence. Ask and he&apos;ll show you, one piece at a time.</p>
+      <p className="text-sm text-dim">
+        {crew
+          ? "Dex puts his evidence on the table for the whole crew, one note every couple of minutes. He doesn't vote."
+          : "Dex holds the rest of the evidence. Ask and he'll show you, one piece at a time."}
+      </p>
       <div className="mt-4 space-y-4">
         {dex.messages.map((m, i) => (
           <div key={i} className="space-y-3">
@@ -48,13 +56,35 @@ export function DexPanel({ room, run, busy }: PhaseProps) {
         <div ref={endRef} />
       </div>
 
+      {crew && (
+        <section className="mt-6">
+          <Label>Dex&apos;s notes · shared with the crew</Label>
+          <div className="mt-3 space-y-6">
+            {dex.shared.map((c, i) => (
+              <ClueCard key={c.id} clue={c} index={i} />
+            ))}
+          </div>
+          <div className="mt-3 text-sm text-dim">
+            {dex.nextReleaseAt !== null ? (
+              <Countdown endsAt={dex.nextReleaseAt} now={now} label={`Next note (${dex.cluesLeft} left)`} />
+            ) : (
+              'Dex has shared everything he has.'
+            )}
+          </div>
+        </section>
+      )}
+
       <div className="mt-6 space-y-2 border-t border-line pt-4">
-        <Button className="w-full" disabled={dex.cluesLeft <= 0} busy={busy === 'dexClue'} onClick={() => run({ type: 'askDex', ask: 'clue' }, 'dexClue')}>
-          {dex.cluesLeft > 0 ? `What have you got? (${dex.cluesLeft})` : 'Dex has shown you everything'}
-        </Button>
+        {!crew && (
+          <Button className="w-full" disabled={dex.cluesLeft <= 0} busy={busy === 'dexClue'} onClick={() => run({ type: 'askDex', ask: 'clue' }, 'dexClue')}>
+            {dex.cluesLeft > 0 ? `What have you got? (${dex.cluesLeft})` : 'Dex has shown you everything'}
+          </Button>
+        )}
         {confirmHint ? (
           <div className="rounded-md border border-rug/60 bg-ink-2 p-3">
-            <p className="text-sm text-paper/85">A Dex hint costs {pct(HELP_PENALTY.dexHint)} of the case score. Ask anyway?</p>
+            <p className="text-sm text-paper/85">
+              A Dex hint costs {pct(HELP_PENALTY.dexHint)} of the case score{crew ? ' for everyone in the crew' : ''}. Ask anyway?
+            </p>
             <div className="mt-3 flex gap-2">
               <Button variant="danger" className="flex-1" busy={busy === 'dexHint'} onClick={hint}>
                 Give me the hint

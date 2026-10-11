@@ -8,7 +8,7 @@ type Ctx = { params: Promise<{ code: string }> }
 
 const Id = z.string().min(1).max(40)
 const Action = z.discriminatedUnion('type', [
-  z.object({ type: z.enum(['join', 'leave', 'start', 'ready', 'skip', 'callVote', 'closeVote', 'hint']) }),
+  z.object({ type: z.enum(['join', 'leave', 'start', 'ready', 'skip', 'callVote', 'closeVote', 'hint', 'addDex', 'removeDex', 'invited']) }),
   z.object({ type: z.literal('vote'), vote: z.object({ culprit: Id, motive: Id, trail: Id }) }),
   z.object({ type: z.literal('trace'), walletId: Id }),
   z.object({ type: z.literal('subpoena'), suspectId: Id }),

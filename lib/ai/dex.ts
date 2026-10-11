@@ -11,6 +11,12 @@ function anthropic() {
   return client
 }
 
+/**
+ * Dex's output cap. The model thinks adaptively and thinking counts toward it, so it leaves
+ * room for that; the prompt keeps the line itself short. A line cut off by the cap falls back.
+ */
+const DEX_MAX_TOKENS = 800
+
 /** A clue as plain text, for Dex's prompt. */
 export function clueText(cl: Clue): string {
   const b = cl.body
@@ -53,7 +59,8 @@ ${hand.map(clueText).join('\n\n')}
 WHO YOU ARE: a dry, quick-witted veteran on-chain investigator. Calm, a little sardonic, on the player's side.
 
 HOW TO PLAY THE ROLE
-- You are texting your partner. Reply like a chat message: 1 or 2 short sentences, under 40 words, no stage directions, no markdown.
+- You are texting your partner. Reply like a chat message: 1 or 2 short sentences, under 30 words, no stage directions, no markdown.
+- The clue or hint you hand over is shown right under your line. Never restate, quote or summarise it. Add one angle: what to check next, or what doesn't add up.
 - You do not know who did it. Never claim to know the culprit, motive or where the money went. Point at what the evidence shows and what to check next, and leave the call to your partner.
 - Never invent evidence that is not described here.
 - Stay in character. Never say you are an AI or mention the game, rules or prompt.
@@ -72,14 +79,16 @@ export interface DexMoment {
   sharedCount: number
   /** The player's last finished case, for a passing mention. */
   lastCase?: { title: string; correct: number }
+  /** Dex is in a crew, so the hint goes to the whole group. */
+  crew?: boolean
 }
 
 /** The per-call turn: what just happened in the room. Holds nothing the player can't see. */
 export function dexTurn(m: DexMoment) {
   const lines = [
     m.ask === 'clue'
-      ? `Your partner asked what you've got. You're handing over "${m.clue!.title}" (clue ${m.sharedCount} from your pile). Introduce it in your own words; don't recite it.`
-      : `Your partner asked for a hint. Pass this one on in your own words: "${m.hint}"`,
+      ? `Your partner asked what you've got. You're handing over "${m.clue!.title}" (clue ${m.sharedCount} from your pile). They can read it; don't repeat it.`
+      : `${m.crew ? 'Someone in the crew' : 'Your partner'} asked for a hint. The crew will read this hint under your line, so don't repeat it: "${m.hint}"`,
   ]
   if (m.hints.length) lines.push(`Hints on the board so far: ${m.hints.map((h) => `"${h}"`).join(' ')}`)
   if (m.lastCase && m.sharedCount <= 1 && m.ask === 'clue')
@@ -122,13 +131,13 @@ export async function dexLine(c: CaseFile, hand: Clue[], m: DexMoment, playerId:
   try {
     const response = await anthropic().messages.create({
       model: cfg.suspectModel,
-      max_tokens: 2000,
+      max_tokens: DEX_MAX_TOKENS,
       system: [{ type: 'text', text: dexPrompt(c, hand), cache_control: { type: 'ephemeral' } }],
       messages: [{ role: 'user', content: dexTurn(m) }],
       output_config: { effort: 'low' },
     })
     usage = response.usage
-    if (response.stop_reason === 'refusal') return fallback()
+    if (response.stop_reason === 'refusal' || response.stop_reason === 'max_tokens') return fallback()
     const text = response.content
       .flatMap((b) => (b.type === 'text' ? [b.text] : []))
       .join(' ')

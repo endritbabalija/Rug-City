@@ -1,9 +1,10 @@
 import type { CaseFile, Clue, Option, Tx, Wallet } from '../cases/types'
-import { dexHand, dexHintsLeft, hasDex } from './dex'
+import { dexHand, dexHintsLeft, dexNextReleaseAt, dexReleaseAt, dexReleased, hasDex } from './dex'
 import { chatKey, cluesFor, countCorrect, questionsLeft, roomMode, suspectsFor } from './engine'
 import { NO_HELP } from './scoring'
 import {
   ACCUSE_GRACE_MS,
+  DEX_ID,
   INVESTIGATE_MS,
   type Award,
   type CaseMode,
@@ -33,6 +34,8 @@ export interface ExplorerWallet extends Omit<Wallet, 'fundedBy' | 'fundingHidden
 
 /** Dex's opener, shown before anything he has said in the room. */
 export const DEX_OPENER = "Dex here. I've got my own pile of evidence on this one. Ask and I'll show you, one piece at a time."
+/** His opener in a crew, where his clues come out on a timer. */
+export const DEX_CREW_OPENER = "Dex here. I'll put my notes on the table for the crew as I go. Shout if you need a hint."
 
 export interface RoomView {
   code: string
@@ -44,6 +47,8 @@ export interface RoomView {
   accuseGraceEndsAt: number | null
   me: { id: number; isHost: boolean; ready: boolean }
   hostId: number
+  /** Dex has a seat in this crew (set in the lobby by the host). */
+  dexSeated: boolean
   players: { id: number; name: string; badge?: string; ready: boolean; voted: boolean }[]
   case: {
     id: string
@@ -67,8 +72,17 @@ export interface RoomView {
   feed: FeedItem[]
   myVote: Vote | null
   votesIn: number
-  /** Dex's corner in rooms where he has a seat: everything he has shared with the player. */
-  dex: { shared: Clue[]; messages: (Pick<DexMessage, 'text' | 'at' | 'hint'> & { clue?: Clue })[]; cluesLeft: number; hintsLeft: number } | null
+  /**
+   * Dex's corner in rooms where he has a seat: everything he has shared. Solo, he shares when
+   * asked; in a crew his clues go public on a timer (`nextReleaseAt`) and his lines are hints.
+   */
+  dex: {
+    shared: Clue[]
+    messages: (Pick<DexMessage, 'text' | 'at' | 'hint'> & { clue?: Clue })[]
+    cluesLeft: number
+    hintsLeft: number
+    nextReleaseAt: number | null
+  } | null
   result:
     | (RoomResult & {
         answer: Vote
@@ -99,6 +113,17 @@ export function buildView(state: RoomState, c: CaseFile, playerId: number, now: 
     threads[suspectId] = { messages: [opener, ...(chats[suspectId] ?? [])], subpoenaArmed: !!state.subpoenas[chatKey(playerId, suspectId)] }
   }
 
+  const crewDex = roomMode(state) === 'crew' && hasDex(state)
+  const released = dexReleased(state, c, now)
+  const dexShared = crewDex ? released : (state.dexShared ?? [])
+  // Crew releases aren't stored: each one becomes a feed line at its release time.
+  const releaseLines: FeedItem[] = released.map((id, i) => ({
+    at: dexReleaseAt(state.investigateStartedAt!, i),
+    playerId: DEX_ID,
+    text: `Dex shared a note: "${clueOf(c, id).title}".`,
+  }))
+  const feed = releaseLines.length ? [...state.feed, ...releaseLines].sort((a, b) => a.at - b.at) : state.feed
+
   const wallets: ExplorerWallet[] = c.wallets.map(({ fundedBy, fundingHidden, ...w }) => {
     const visible = !fundingHidden || state.traced.includes(w.id) || revealed
     return { ...w, fundedBy: visible ? fundedBy : null, traceable: !visible }
@@ -114,6 +139,7 @@ export function buildView(state: RoomState, c: CaseFile, playerId: number, now: 
     accuseGraceEndsAt: state.phase === 'accuse' ? state.phaseStartedAt + ACCUSE_GRACE_MS : null,
     me: { id: playerId, isHost: state.hostId === playerId, ready: !!me?.ready },
     hostId: state.hostId,
+    dexSeated: hasDex(state) || !!state.dexSeated,
     players: state.players.map((p) => ({ id: p.id, name: p.name, badge: p.badge, ready: p.ready, voted: !!state.votes[String(p.id)] })),
     case: {
       id: c.id,
@@ -134,19 +160,20 @@ export function buildView(state: RoomState, c: CaseFile, playerId: number, now: 
     questionsLeft: questionsLeft(state, playerId),
     explorer: { wallets, txs: c.txs },
     hints: c.hints.slice(0, revealed ? c.hints.length : state.hintsRevealed),
-    feed: state.feed,
+    feed,
     myVote: state.votes[String(playerId)] ?? null,
     votesIn: Object.keys(state.votes).length,
     dex:
       hasDex(state) && inCase
         ? {
-            shared: (state.dexShared ?? []).map((id) => clueOf(c, id)),
+            shared: dexShared.map((id) => clueOf(c, id)),
             messages: [
-              { text: DEX_OPENER, at: state.investigateStartedAt ?? state.phaseStartedAt },
+              { text: crewDex ? DEX_CREW_OPENER : DEX_OPENER, at: state.investigateStartedAt ?? state.phaseStartedAt },
               ...(state.dexMessages ?? []).map(({ text, at, clueId, hint }) => ({ text, at, hint, clue: clueId ? clueOf(c, clueId) : undefined })),
             ],
-            cluesLeft: dexHand(state, c).length - (state.dexShared ?? []).length,
+            cluesLeft: dexHand(state, c).length - dexShared.length,
             hintsLeft: dexHintsLeft(state, c),
+            nextReleaseAt: dexNextReleaseAt(state, c, now),
           }
         : null,
     result:

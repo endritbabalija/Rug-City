@@ -28,6 +28,8 @@ const season = await import('@/lib/season')
 const { currentSeason } = await import('@/lib/seasons')
 const ai = await import('@/lib/ai/suspect')
 const { MEDIAN_AFTER_PLAYS } = await import('@/lib/game/scoring')
+const { DEX_RELEASE_SCHEDULE } = await import('@/lib/game/dex')
+const { DEX_ID } = await import('@/lib/game/types')
 
 async function mkPlayer(id: number, referredBy?: number) {
   return store().createPlayer(newPlayer({ id, name: `P${id}` }, Date.now(), referredBy))
@@ -507,5 +509,81 @@ describe('solo with Dex', () => {
     await expect(rooms.act(code, await fresh(other), { type: 'join' })).rejects.toMatchObject({ code: 'WRONG_PHASE' })
     await rooms.act(code, await fresh(me), { type: 'ready' })
     await expect(rooms.act(code, await fresh(other), { type: 'askDex', ask: 'clue' })).rejects.toMatchObject({ code: 'NOT_IN_ROOM' })
+  })
+})
+
+describe('Dex in the crew', () => {
+  it('stays out of crews while dex_crew is off', async () => {
+    const [host, a] = ids(2)
+    for (const id of [host, a]) await mkPlayer(id)
+    const code = await lobbyWith(host, [a])
+    await expect(rooms.act(code, await fresh(host), { type: 'addDex' })).rejects.toMatchObject({ code: 'NOT_AVAILABLE' })
+  })
+
+  it('plays 2 humans + Dex from lobby to verdict, rated as crew', async () => {
+    const [host, a] = ids(2)
+    for (const id of [host, a]) await mkPlayer(id)
+    const code = await lobbyWith(host, [a])
+    const write = vi.spyOn(store(), 'trackEvents')
+    process.env.FLAGS = 'dex_crew'
+    try {
+      expect((await rooms.viewRoom(code, await fresh(host))).minPlayers).toBe(3)
+      await rooms.act(code, await fresh(host), { type: 'addDex' })
+      const lobby = await rooms.viewRoom(code, await fresh(a))
+      expect(lobby).toMatchObject({ dexSeated: true, minPlayers: 2 })
+
+      const started = await rooms.act(code, await fresh(host), { type: 'start' })
+      expect(started.seats).toEqual([host, a, DEX_ID])
+      await rooms.act(code, await fresh(host), { type: 'skip' })
+      // Dex's notes go public on his timer, for everyone.
+      const later = Date.now() + DEX_RELEASE_SCHEDULE.firstMs
+      const clock = vi.spyOn(Date, 'now').mockReturnValue(later)
+      try {
+        for (const id of [host, a]) expect((await rooms.viewRoom(code, await fresh(id))).dex!.shared).toHaveLength(1)
+      } finally {
+        clock.mockRestore()
+      }
+      // Any player can ask him for a hint; it lands on the shared board.
+      await rooms.act(code, await fresh(a), { type: 'askDex', ask: 'hint' })
+      const hostView = await rooms.viewRoom(code, await fresh(host))
+      expect(hostView.hints).toHaveLength(1)
+      expect(hostView.dex!.messages.at(-1)?.hint).toBe(hostView.hints[0])
+
+      await rooms.act(code, await fresh(host), { type: 'callVote' })
+      await rooms.act(code, await fresh(host), { type: 'vote', vote: ANSWER })
+      const done = await rooms.act(code, await fresh(a), { type: 'vote', vote: ANSWER })
+      expect(done.phase).toBe('reveal')
+      expect(done.result!.help.dexHint).toBe(1)
+      expect(Object.keys(done.awards!).sort()).toEqual([String(host), String(a)].sort())
+      for (const id of [host, a]) {
+        const [row] = await store().recentResults(id, 1)
+        expect(row).toMatchObject({ roomCode: code, mode: 'crew', seats: 2, correct: 3 })
+        expect(row.rating).toBe(done.result!.score)
+      }
+
+      await new Promise((r) => setTimeout(r, 0))
+      const events = write.mock.calls.flatMap(([batch]) => batch).filter((e) => e.props.code === code)
+      expect(events.find((e) => e.name === 'case_start')?.props).toEqual({ caseId: 'mooncat-exit', mode: 'crew', seats: 2, code })
+    } finally {
+      delete process.env.FLAGS
+      write.mockRestore()
+    }
+  })
+
+  it('records invite_sent without changing the room', async () => {
+    const [host] = ids(1)
+    await mkPlayer(host)
+    const code = await rooms.createRoom(await fresh(host), 'mooncat-exit')
+    const before = await store().getRoom(code)
+    const write = vi.spyOn(store(), 'trackEvents')
+    try {
+      await rooms.act(code, await fresh(host), { type: 'invited' })
+      await new Promise((r) => setTimeout(r, 0))
+      const events = write.mock.calls.flatMap(([batch]) => batch)
+      expect(events.filter((e) => e.name === 'invite_sent')).toEqual([expect.objectContaining({ playerId: host, props: { code } })])
+      expect(await store().getRoom(code)).toEqual(before)
+    } finally {
+      write.mockRestore()
+    }
   })
 })
