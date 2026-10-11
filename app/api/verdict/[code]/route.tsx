@@ -1,5 +1,5 @@
 import { ImageResponse } from 'next/og'
-import { getCase } from '@/lib/cases'
+import { caseForRoom } from '@/lib/cases'
 import { store } from '@/lib/store'
 
 // Public on purpose: Telegram fetches this URL when a player shares the verdict to their story.
@@ -15,7 +15,7 @@ const TAPE = '#f2c230'
 export async function GET(_req: Request, { params }: Ctx) {
   const code = (await params).code.toUpperCase().replace(/\.PNG$/, '')
   const room = /^[A-Z0-9]{5}$/.test(code) ? await store().getRoom(code) : null
-  const c = room && getCase(room.caseId)
+  const c = room && (await caseForRoom(room.caseId))
   if (!room || !c || room.phase !== 'reveal' || !room.result) return new Response('Not found', { status: 404 })
 
   const r = room.result

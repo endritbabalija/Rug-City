@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { clueText, dexPrompt, dexTurn, fallbackDexLine } from '@/lib/ai/dex'
-import { CASES } from '@/lib/cases'
+import { BUILT_IN_CASES as CASES } from '@/lib/cases'
 import { mooncat } from '@/lib/cases/mooncat'
 import * as engine from '@/lib/game/engine'
 import { GameError } from '@/lib/game/engine'

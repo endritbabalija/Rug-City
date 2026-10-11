@@ -1,5 +1,8 @@
 // Case data is server-only: it holds the hidden truth and every player's
 // private clues. Clients only ever receive the projection from lib/game/view.ts.
+// lib/cases/schema.ts validates cases against these types when they load from the database.
+
+import type { DistrictId } from '../districts'
 
 export type Archetype = 'anon-dev' | 'influencer' | 'co-founder' | 'community-mod' | 'audit-firm' | 'whale'
 
@@ -105,4 +108,7 @@ export interface CaseFile {
   reveal: string[]
   /** Target solve time in seconds, until the case has enough plays for a median (`targetFor`). */
   targetSec: number
+  district: DistrictId
+  /** A teaser: playable even while its district is locked. */
+  preview?: boolean
 }

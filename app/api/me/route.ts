@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { track } from '@/lib/analytics'
-import { caseSummaries } from '@/lib/cases'
+import { caseBoard } from '@/lib/cases'
 import { badgeInfo, BADGES, SKUS } from '@/lib/catalog'
 import { flag } from '@/lib/flags'
 import { GameError } from '@/lib/game/engine'
@@ -11,14 +11,23 @@ import { store } from '@/lib/store'
 export const GET = route(async (req) => {
   const { player, init } = await authenticate(req)
   track('app_open', player.id, { startParam: init?.startParam ?? null })
-  const [pub, seasonBanner, solo, dexCrew] = await Promise.all([publicPlayer(player), flag('season_banner'), flag('solo'), flag('dex_crew')])
+  const [pub, board, seasonBanner, solo, dexCrew, districts] = await Promise.all([
+    publicPlayer(player),
+    store()
+      .playedCaseIds(player.id)
+      .then((played) => caseBoard(player, played)),
+    flag('season_banner'),
+    flag('solo'),
+    flag('dex_crew'),
+    flag('districts'),
+  ])
   return NextResponse.json({
     player: pub,
     startParam: init?.startParam ?? null,
-    cases: caseSummaries(),
+    ...board,
     skus: SKUS,
     badges: badgeMap(pub.badges),
-    flags: { season_banner: seasonBanner, solo, dex_crew: dexCrew },
+    flags: { season_banner: seasonBanner, solo, dex_crew: dexCrew, districts },
   })
 })
 

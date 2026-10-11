@@ -1,10 +1,26 @@
 import { describe, expect, it } from 'vitest'
-import { CASES } from '@/lib/cases'
 import { dealClues, dealSuspects } from '@/lib/game/engine'
 
 // Static checks standing in for the concept doc's "blind solver" gate:
 // every case must be internally consistent, and no single player may ever hold
 // a complete proof of the culprit on their own, for any group size from 3 to 6.
+// Runs over every case the repository serves (the built-ins, on the memory store).
+
+delete process.env.NEXT_PUBLIC_SUPABASE_URL
+const { BUILT_IN_CASES, listCases } = await import('@/lib/cases')
+const { caseSchema } = await import('@/lib/cases/schema')
+const CASES = await listCases()
+
+describe('the repository', () => {
+  it('serves every built-in case', () => {
+    expect(CASES.map((c) => c.id).sort()).toEqual(BUILT_IN_CASES.map((c) => c.id).sort())
+  })
+
+  it.each(BUILT_IN_CASES.map((c) => [c.id, c] as const))('%s passes the case schema', (_id, c) => {
+    const parsed = caseSchema.safeParse(c)
+    expect(parsed.error?.issues ?? []).toEqual([])
+  })
+})
 
 describe.each(CASES.map((c) => [c.title, c] as const))('%s', (_title, c) => {
   const clueIds = new Set(c.clues.map((cl) => cl.id))

@@ -3,10 +3,11 @@ import { randomInt } from 'node:crypto'
 import { dexLine, fallbackDexLine } from './ai/dex'
 import { suspectReply } from './ai/suspect'
 import { track } from './analytics'
-import { getCase } from './cases'
+import { caseForRoom, getCase } from './cases'
 import type { CaseFile } from './cases/types'
 import type { ItemKey } from './catalog'
 import { badgeInfo } from './catalog'
+import { canPlay, districtById } from './districts'
 import { env } from './env'
 import { flag } from './flags'
 import * as engine from './game/engine'
@@ -32,8 +33,20 @@ export function normalizeCode(code: string) {
   return c
 }
 
-function requireCase(id: string): CaseFile {
-  const c = getCase(id)
+/** A case the player may open a room for: released, and in a district open to them unless it's a preview. */
+async function requireHostable(player: Player, id: string): Promise<CaseFile> {
+  const c = await getCase(id)
+  if (!c) throw new GameError('UNKNOWN_CASE', 'Unknown case.', 404)
+  if (!canPlay(player, c)) {
+    const d = districtById(c.district)
+    throw new GameError('LOCKED', `${d?.name ?? 'This district'} opens at ${d?.unlockRank ?? 'a higher'} rank.`, 403)
+  }
+  return c
+}
+
+/** The case an existing room plays, whatever its status now. */
+async function requireCase(id: string): Promise<CaseFile> {
+  const c = await caseForRoom(id)
   if (!c) throw new GameError('UNKNOWN_CASE', 'Unknown case.', 404)
   return c
 }
@@ -41,7 +54,7 @@ function requireCase(id: string): CaseFile {
 async function loadRoom(code: string) {
   const room = await store().getRoom(code)
   if (!room) throw new GameError('NO_ROOM', 'This case has closed or never existed.', 404)
-  return { room, caseFile: requireCase(room.caseId) }
+  return { room, caseFile: await requireCase(room.caseId) }
 }
 
 /** Admins (ADMIN_TELEGRAM_IDS) can host a case alone to test it in production. */
@@ -62,7 +75,7 @@ async function insertRoom(make: (code: string) => RoomState) {
 }
 
 export async function createRoom(player: Player, caseId: string) {
-  const c = requireCase(caseId)
+  const c = await requireHostable(player, caseId)
   return (await insertRoom((code) => engine.createRoom(code, c, { id: player.id, name: player.name, badge: badgeOf(player) }, Date.now()))).code
 }
 
@@ -80,7 +93,7 @@ function caseCharge() {
 
 /** A solo case with Dex: charged like hosting, refunded if the room can't be created. */
 export async function createSolo(player: Player, caseId: string) {
-  const c = requireCase(caseId)
+  const c = await requireHostable(player, caseId)
   const [charge, refund] = caseCharge()
   await store().updatePlayer(player.id, charge)
   let room: RoomState
@@ -235,7 +248,8 @@ async function askDex(code: string, player: Player, ask: dex.DexAsk) {
   // The clue or hint is already the player's; his line is only flavour, so a failure falls back to the script.
   const clueById = (id: string) => caseFile.clues.find((cl) => cl.id === id)!
   const last = (await store().recentResults(player.id, 2).catch(() => [])).find((r) => r.roomCode !== code)
-  const lastCase = last && getCase(last.caseId) ? { title: getCase(last.caseId)!.title, correct: last.correct } : undefined
+  const lastFile = last && (await caseForRoom(last.caseId).catch(() => undefined))
+  const lastCase = last && lastFile ? { title: lastFile.title, correct: last.correct } : undefined
   const moment = {
     ask,
     clue: clueId ? clueById(clueId) : undefined,
@@ -304,7 +318,7 @@ export async function settleAfter(state: RoomState) {
   })
   if (!claimed) return settled
 
-  const caseFile = requireCase(settled.caseId)
+  const caseFile = await requireCase(settled.caseId)
   const now = Date.now()
   // Counted once per room, after the claim. A missed count only delays the switch to the median.
   await store()

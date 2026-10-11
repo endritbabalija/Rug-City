@@ -42,6 +42,23 @@ export interface ChatRow extends ChatMessage {
   seq: number
 }
 
+export type CaseStatus = 'draft' | 'review' | 'live' | 'retired'
+
+/** One `cases` row without its case file: enough to decide whether the case can be played. */
+export interface CaseMeta {
+  id: string
+  district: string
+  status: CaseStatus
+  /** Null: live as soon as its status is. */
+  releaseAt: number | null
+  version: number
+}
+
+/** A full `cases` row. `data` is unchecked JSON until `caseSchema` validates it. */
+export interface CaseRow extends CaseMeta {
+  data: unknown
+}
+
 export interface Store {
   getPlayer(id: number): Promise<Player | null>
   /** Inserts the player unless one with the same id exists; returns whichever is stored. */
@@ -60,6 +77,8 @@ export interface Store {
   /** Returns false if this player already has a result for this room. */
   insertCaseResult(row: CaseResultRow): Promise<boolean>
   hasPlayed(playerId: number, caseId: string): Promise<boolean>
+  /** Every case id the player has a result for. */
+  playedCaseIds(playerId: number): Promise<string[]>
   /** Newest first. */
   recentResults(playerId: number, limit: number): Promise<CaseResultRow[]>
   /** Every rated score the player finished within the season. */
@@ -72,6 +91,12 @@ export interface Store {
   deleteLastChat(code: string, playerId: number, suspectId: string): Promise<void>
 
   getSeasons(): Promise<Season[]>
+
+  /** Every row of the `cases` table, without the case files. */
+  listCaseMeta(): Promise<CaseMeta[]>
+  getCaseRow(id: string): Promise<CaseRow | null>
+  /** Inserts or replaces a case row. */
+  saveCase(row: CaseRow): Promise<void>
 
   getCaseStats(caseId: string, mode: CaseMode): Promise<CaseStats | null>
   /** Counts one finished room of a case in a mode, creating its row on the first play. */

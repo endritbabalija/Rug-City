@@ -4,7 +4,7 @@
 import type { Season } from '../game/progress'
 import type { CaseResultRow, CaseStats, RoomState } from '../game/types'
 import type { Player } from '../player'
-import type { AppEvent, ChatRow, Purchase, PurchaseStatus, SeasonRating, Store } from './types'
+import type { AppEvent, CaseRow, ChatRow, Purchase, PurchaseStatus, SeasonRating, Store } from './types'
 
 const clone = <T,>(v: T): T => structuredClone(v)
 
@@ -36,6 +36,8 @@ export function createMemoryStore(): Store {
   const events: AppEvent[] = []
   const flags: Record<string, boolean> = {}
   const caseStats = new Map<string, CaseStats>()
+  // Empty unless a test saves a row: the built-in cases stand in for the table.
+  const caseRows = new Map<string, CaseRow>()
   const ranked = (season: number) => [...ratings.values()].filter((r) => r.season === season && r.rating > 0).sort(byStanding)
 
   return {
@@ -83,6 +85,9 @@ export function createMemoryStore(): Store {
     async hasPlayed(playerId, caseId) {
       return results.some((r) => r.playerId === playerId && r.caseId === caseId)
     },
+    async playedCaseIds(playerId) {
+      return [...new Set(results.filter((r) => r.playerId === playerId).map((r) => r.caseId))]
+    },
     async recentResults(playerId, limit) {
       return clone(results.filter((r) => r.playerId === playerId).sort((a, b) => b.at - a.at).slice(0, limit))
     },
@@ -106,6 +111,17 @@ export function createMemoryStore(): Store {
 
     async getSeasons() {
       return clone(SEASON_SEED)
+    },
+
+    async listCaseMeta() {
+      return [...caseRows.values()].map((r) => ({ id: r.id, district: r.district, status: r.status, releaseAt: r.releaseAt, version: r.version }))
+    },
+    async getCaseRow(id) {
+      const row = caseRows.get(id)
+      return row ? clone(row) : null
+    },
+    async saveCase(row) {
+      caseRows.set(row.id, clone(row))
     },
 
     async getCaseStats(caseId, mode) {

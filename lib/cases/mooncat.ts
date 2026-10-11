@@ -362,4 +362,5 @@ export const mooncat: CaseFile = {
   ],
   // 15 minutes until playtests give a better number.
   targetSec: 900,
+  district: 'memecoin-swamp',
 }
