@@ -101,7 +101,7 @@ export function Sheet({ open, onClose, children, title }: { open: boolean; onClo
       <div className="safe-bottom max-h-[85dvh] w-full animate-rise overflow-y-auto rounded-t-2xl border-t border-line bg-ink-2 p-5" onClick={(e) => e.stopPropagation()}>
         <div className="mb-4 flex items-center justify-between">
           <h3 className="font-display text-2xl font-black uppercase">{title}</h3>
-          <button onClick={onClose} className="h-9 w-9 rounded-full border border-line text-dim" aria-label="Close">
+          <button onClick={onClose} className="h-11 w-11 shrink-0 rounded-full border border-line text-dim" aria-label="Close">
             ✕
           </button>
         </div>

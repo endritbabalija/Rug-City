@@ -48,7 +48,8 @@ export function Game() {
   }
 
   return (
-    <main className="safe-top safe-bottom mx-auto min-h-dvh max-w-xl">
+    // Clipped sideways so stamps scaling in can't make the page scroll horizontally.
+    <main className="safe-top safe-bottom mx-auto min-h-dvh max-w-xl overflow-x-clip">
       {run ? (
         // Keyed by run so a restart or a different run starts with fresh screen state.
         <Investigation key={run.runId} initial={run} onHome={goHome} />

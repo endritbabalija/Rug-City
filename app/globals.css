@@ -86,8 +86,24 @@ body::after {
 }
 
 /* Telegram sets these when the app runs fullscreen (Bot API 8.0); zero elsewhere. */
+:root {
+  --safe-top: calc(var(--tg-safe-area-inset-top, 0px) + var(--tg-content-safe-area-inset-top, 0px));
+}
 .safe-top {
-  padding-top: calc(var(--tg-safe-area-inset-top, 0px) + var(--tg-content-safe-area-inset-top, 0px));
+  padding-top: var(--safe-top);
+}
+/* Sticky bars stop below Telegram's fullscreen header, with the gap above them filled in. */
+.sticky-safe-top {
+  position: sticky;
+  top: var(--safe-top);
+}
+.sticky-safe-top::before {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  bottom: 100%;
+  height: var(--safe-top);
+  background: inherit;
 }
 .safe-bottom {
   padding-bottom: max(var(--tg-safe-area-inset-bottom, 0px), env(safe-area-inset-bottom, 0px));
