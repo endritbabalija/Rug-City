@@ -10,6 +10,12 @@ vi.mock('@/lib/telegram/bot-api', () => ({
   miniAppLink: () => 'https://t.me/bot/app',
 }))
 
+// Real scripted replies, but a test can make one fail.
+vi.mock('@/lib/ai/suspect', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/ai/suspect')>()
+  return { ...actual, suspectReply: vi.fn(actual.suspectReply) }
+})
+
 process.env.TELEGRAM_BOT_TOKEN = 'test-token'
 delete process.env.NEXT_PUBLIC_SUPABASE_URL
 delete process.env.ANTHROPIC_API_KEY
@@ -19,7 +25,8 @@ const rooms = await import('@/lib/rooms')
 const payments = await import('@/lib/payments')
 const { newPlayer } = await import('@/lib/player')
 const season = await import('@/lib/season')
-const { seasonOf, SEASON_MS } = await import('@/lib/game/progress')
+const { currentSeason } = await import('@/lib/seasons')
+const ai = await import('@/lib/ai/suspect')
 
 async function mkPlayer(id: number, referredBy?: number) {
   return store().createPlayer(newPlayer({ id, name: `P${id}` }, Date.now(), referredBy))
@@ -113,10 +120,35 @@ describe('power-ups', () => {
     await rooms.act(code, await fresh(host), { type: 'skip' })
     const view = await rooms.viewRoom(code, await fresh(a))
     const suspect = view.mySuspects[0]
-    const after = await rooms.ask(code, await fresh(a), suspect, 'Where were you at 3am?')
-    const thread = after.chats[`${a}:${suspect}`]
+    await rooms.ask(code, await fresh(a), suspect, 'Where were you at 3am?')
+    // The first message is the suspect's opener.
+    const thread = (await rooms.viewRoom(code, await fresh(a))).chats[suspect].messages.slice(1)
     expect(thread.map((m) => m.from)).toEqual(['player', 'suspect'])
     expect(thread[1].text.length).toBeGreaterThan(0)
+  })
+
+  it('refunds a question whose answer failed and removes it from the chat', async () => {
+    const [host, a, b] = ids(3)
+    for (const id of [host, a, b]) await mkPlayer(id)
+    const code = await lobbyWith(host, [a, b])
+    await rooms.act(code, await fresh(host), { type: 'start' })
+    await rooms.act(code, await fresh(host), { type: 'skip' })
+    const before = await rooms.viewRoom(code, await fresh(a))
+    const suspect = before.mySuspects[0]
+
+    vi.mocked(ai.suspectReply).mockRejectedValueOnce(new Error('AI down'))
+    await expect(rooms.ask(code, await fresh(a), suspect, 'Where were you?')).rejects.toThrow('AI down')
+    const after = await rooms.viewRoom(code, await fresh(a))
+    expect(after.questionsLeft).toBe(before.questionsLeft)
+    expect(after.chats[suspect].messages).toHaveLength(1)
+    expect(await store().getChats(code, a)).toEqual([])
+
+    // The thread isn't stuck waiting: the next question goes through.
+    await rooms.ask(code, await fresh(a), suspect, 'Where were you?')
+    expect((await store().getChats(code, a)).map((c) => [c.seq, c.from])).toEqual([
+      [0, 'player'],
+      [1, 'suspect'],
+    ])
   })
 })
 
@@ -251,10 +283,14 @@ describe('Clue Points', () => {
     expect((await fresh(friend)).referralSettled).toBeFalsy()
     expect((await fresh(host)).caseCredits).toBe(0)
 
-    // Their next, rated case pays out to both.
-    await store().updatePlayer(friend, (p) => ({ ...p, playedCases: [] }))
+    // Their next, rated case pays out to both (as if it were a different case).
+    const played = vi.spyOn(store(), 'hasPlayed').mockResolvedValue(false)
     const second = await lobbyWith(host, [friend, other])
-    await playThrough(second, host, { [host]: ANSWER, [friend]: ANSWER, [other]: ANSWER })
+    try {
+      await playThrough(second, host, { [host]: ANSWER, [friend]: ANSWER, [other]: ANSWER })
+    } finally {
+      played.mockRestore()
+    }
     expect((await fresh(friend)).caseCredits).toBe(1)
     expect((await fresh(host)).caseCredits).toBe(1)
     const hostAward = (await rooms.viewRoom(second, await fresh(host))).result!.myAward!.total
@@ -270,20 +306,36 @@ describe('Clue Points', () => {
     expect((await store().getSeasonLeaderboard(99, 5)).rows[0]).toMatchObject({ rating: 180, cases: 3, updatedAt: 1 })
   })
 
+  it('settles a room twice without writing a second result or paying twice', async () => {
+    const [host, a, b] = ids(3)
+    for (const id of [host, a, b]) await mkPlayer(id)
+    const code = await lobbyWith(host, [a, b])
+    await playThrough(code, host, { [host]: ANSWER, [a]: ANSWER, [b]: WRONG })
+    const points = (await fresh(a)).cluePoints
+    const award = (await rooms.viewRoom(code, await fresh(a))).result?.myAward
+
+    // Undo the room's claim, as if a crash had lost it, and settle again.
+    const reopened = await store().updateRoom(code, (s) => ({ ...s, rewardsSettled: false }))
+    await rooms.settleAfter(reopened)
+    expect((await fresh(a)).cluePoints).toBe(points)
+    expect((await store().recentResults(a, 10)).filter((r) => r.roomCode === code)).toHaveLength(1)
+    expect((await rooms.viewRoom(code, await fresh(a))).result?.myAward).toEqual(award)
+  })
+
   it('grants season rewards only after the season, and only once', async () => {
     const now = Date.now()
-    await expect(season.grantSeasonRewards(seasonOf(now), now)).rejects.toThrow(/hasn't ended/)
+    const { id, end } = await currentSeason(now)
+    await expect(season.grantSeasonRewards(id, now)).rejects.toThrow(/hasn't ended/)
 
-    const later = now + SEASON_MS
-    const first = await season.grantSeasonRewards(seasonOf(now), later)
+    const first = await season.grantSeasonRewards(id, end)
     expect(first.granted).toBe(first.rewarded)
     expect(first.rewarded).toBeGreaterThan(0)
-    const top = (await store().getSeasonLeaderboard(seasonOf(now), 1)).rows[0]
+    const top = (await store().getSeasonLeaderboard(id, 1)).rows[0]
     const winner = await fresh(top.playerId)
-    expect(winner.badges).toContain(`s${seasonOf(now)}-top10`)
+    expect(await store().getBadges(top.playerId)).toContain(`s${id}-top10`)
     expect(winner.caseCredits).toBeGreaterThanOrEqual(5)
 
-    const second = await season.grantSeasonRewards(seasonOf(now), later)
+    const second = await season.grantSeasonRewards(id, end)
     expect(second.granted).toBe(0)
     expect((await fresh(top.playerId)).caseCredits).toBe(winner.caseCredits)
   })

@@ -9,10 +9,11 @@ import { badgeInfo } from './catalog'
 import { env } from './env'
 import * as engine from './game/engine'
 import { GameError } from './game/engine'
-import { awardCase, REFERRAL_POINTS, seasonRating } from './game/progress'
-import type { Award, RoomState, Vote } from './game/types'
+import { applyAward, awardCase, REFERRAL_POINTS, seasonRating } from './game/progress'
+import type { Award, ChatMessage, RoomState, Vote } from './game/types'
 import { buildView } from './game/view'
 import { applyGrant, consumeCase, hasFreeCase, spendItem, type Player } from './player'
+import { currentSeason } from './seasons'
 import { store } from './store'
 
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
@@ -56,9 +57,16 @@ export async function createRoom(player: Player, caseId: string) {
   throw new Error('Could not allocate a room code')
 }
 
+/** A player's suspect chats in a room, by suspect id. */
+async function loadChats(code: string, playerId: number) {
+  const threads: Record<string, ChatMessage[]> = {}
+  for (const { suspectId, from, text, at, subpoena } of await store().getChats(code, playerId)) (threads[suspectId] ??= []).push({ from, text, at, subpoena })
+  return threads
+}
+
 export async function viewRoom(code: string, player: Player) {
-  const { room, caseFile } = await loadRoom(code)
-  return { ...buildView(room, caseFile, player.id, Date.now()), member: engine.isMember(room, player.id), minPlayers: minPlayersFor(room.hostId) }
+  const [{ room, caseFile }, chats] = await Promise.all([loadRoom(code), loadChats(code, player.id)])
+  return { ...buildView(room, caseFile, player.id, Date.now(), chats), member: engine.isMember(room, player.id), minPlayers: minPlayersFor(room.hostId) }
 }
 
 /** Run a pure engine step against the stored room with optimistic concurrency. */
@@ -90,7 +98,7 @@ async function chargedStep(
 }
 
 function itemCharge(item: ItemKey) {
-  return [(p: Player) => spendItem(p, item), (p: Player) => applyGrant(p, { items: { [item]: 1 } })] as const
+  return [(p: Player) => spendItem(p, item), (p: Player) => applyGrant(p, { items: { [item]: 1 } }).player] as const
 }
 
 export type RoomAction =
@@ -154,20 +162,31 @@ export async function ask(code: string, player: Player, suspectId: string, text:
   if (!suspect) throw new GameError('UNKNOWN_SUSPECT', 'Unknown suspect.', 404)
 
   let subpoenaed = false
-  const asked = await store().updateRoom(code, (s) => {
-    const r = engine.askSuspect(s, caseFile, player.id, suspectId, text, Date.now())
+  await store().updateRoom(code, (s) => {
+    const r = engine.askSuspect(s, caseFile, player.id, suspectId)
     subpoenaed = r.subpoenaed
     return r.state
   })
 
-  let reply: string
+  // The room now marks this thread as waiting, so nothing else appends to it until we're done.
+  const row = { roomCode: code, playerId: player.id, suspectId, subpoena: subpoenaed || undefined }
+  let stored = false
   try {
-    reply = await suspectReply(caseFile, suspect, asked.chats[engine.chatKey(player.id, suspectId)] ?? [], subpoenaed, player.id)
+    const history = (await loadChats(code, player.id))[suspectId] ?? []
+    const question: ChatMessage = { from: 'player', text, at: Date.now(), subpoena: row.subpoena }
+    await store().appendChat({ ...row, ...question, seq: history.length })
+    stored = true
+    const reply = await suspectReply(caseFile, suspect, [...history, question], subpoenaed, player.id)
+    await store().appendChat({ ...row, from: 'suspect', text: reply, at: Date.now(), seq: history.length + 1 })
   } catch (err) {
-    await store().updateRoom(code, (s) => engine.refundQuestion(s, player.id, suspectId, subpoenaed))
+    try {
+      if (stored) await store().deleteLastChat(code, player.id, suspectId)
+    } finally {
+      await store().updateRoom(code, (s) => engine.refundQuestion(s, player.id, suspectId, subpoenaed))
+    }
     throw err
   }
-  return store().updateRoom(code, (s) => engine.suspectReply(s, player.id, suspectId, reply, Date.now(), subpoenaed))
+  return store().updateRoom(code, (s) => engine.suspectReply(s, player.id, suspectId))
 }
 
 /**
@@ -178,8 +197,9 @@ export async function ask(code: string, player: Player, suspectId: string, text:
  * The room is claimed first so no second request can settle it again. After that every
  * seat settles independently: one failing write never blocks the other players, and the
  * awards that did succeed are always written back so the verdict screen can show them.
+ * Exported for tests: settling again is safe, since each seat's `case_results` row pays once.
  */
-async function settleAfter(state: RoomState) {
+export async function settleAfter(state: RoomState) {
   if (state.phase !== 'reveal' || state.rewardsSettled || !state.result) return state
   let claimed = false
   const settled = await store().updateRoom(state.code, (s) => {
@@ -195,36 +215,55 @@ async function settleAfter(state: RoomState) {
     settled.seats.map(async (id) => {
       try {
         const award = await settleSeat(settled, caseFile, id, now)
-        awards[String(id)] = award
+        if (award) awards[String(id)] = award
       } catch (err) {
         console.error('Settling seat failed', settled.code, id, err)
       }
     }),
   )
-  return store().updateRoom(state.code, (s) => ({ ...s, awards }))
+  return store().updateRoom(state.code, (s) => ({ ...s, awards: { ...s.awards, ...awards } }))
 }
 
-async function settleSeat(room: RoomState, caseFile: CaseFile, id: number, now: number) {
+/** Settles one seat; returns null if this room was already settled for them. */
+async function settleSeat(room: RoomState, caseFile: CaseFile, id: number, now: number): Promise<Award | null> {
+  const season = await currentSeason(now)
+  const [before, alreadyPlayed, seasonScores] = await Promise.all([
+    store().getPlayer(id),
+    store().hasPlayed(id, caseFile.id),
+    store().seasonScores(id, season),
+  ])
+  if (!before) throw new Error(`Player ${id} not found`)
+  const { award, result, ratingChanged } = awardCase(before, {
+    code: room.code,
+    caseFile,
+    seats: room.seats.length,
+    vote: room.votes[String(id)],
+    result: room.result!,
+    assisted: !!room.assisted,
+    now,
+    alreadyPlayed,
+    seasonScores,
+  })
+
+  // The result row is the claim: a second settle of this room finds it and pays nothing.
+  if (!(await store().insertCaseResult(result))) return null
+
   let referrer: number | undefined
-  let award: Award | undefined
-  let ratingChanged = false
   const player = await store().updatePlayer(id, (p) => {
-    const r = awardCase(p, { caseFile, seats: room.seats.length, vote: room.votes[String(id)], result: room.result!, assisted: !!room.assisted, now })
-    award = r.award
-    ratingChanged = r.ratingChanged
+    const next = applyAward(p, award, now)
     referrer = undefined
     // The referral pays out on the friend's first case that counts, not just any finish.
-    if (!p.referredBy || p.referralSettled || r.award.unrated) return r.player
+    if (!p.referredBy || p.referralSettled || award.unrated) return next
     referrer = p.referredBy
-    return { ...r.player, referralSettled: true, caseCredits: r.player.caseCredits + 1 }
+    return { ...next, referralSettled: true, caseCredits: next.caseCredits + 1 }
   })
 
   // Bookkeeping after the player's points are safe: a failure here costs a leaderboard
   // refresh or a referral bonus, never the points themselves.
   if (ratingChanged) {
-    const { rating, cases } = seasonRating(player, now)
+    const { rating, cases } = seasonRating([...seasonScores, award.rating!])
     await store()
-      .raiseSeasonRating({ season: player.season!.id, playerId: id, name: player.name, badge: badgeOf(player), rating, cases, updatedAt: now })
+      .raiseSeasonRating({ season: season.id, playerId: id, name: player.name, badge: badgeOf(player), rating, cases, updatedAt: now })
       .catch((err) => console.error('Leaderboard write failed', id, err))
   }
   if (referrer) {
@@ -236,13 +275,12 @@ async function settleSeat(room: RoomState, caseFile: CaseFile, id: number, now: 
       console.error('Referral bonus failed', referrer, err)
     }
   }
-  const vote = room.votes[String(id)]
   track('case_finish', id, {
     caseId: room.caseId,
     code: room.code,
-    correct: vote ? engine.countCorrect(caseFile, vote) : 0,
-    total: award!.total,
-    unrated: award!.unrated ?? null,
+    correct: result.correct,
+    total: award.total,
+    unrated: award.unrated ?? null,
   })
-  return award!
+  return award
 }

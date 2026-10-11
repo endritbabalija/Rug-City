@@ -4,9 +4,11 @@ import { NextResponse } from 'next/server'
 import { ZodError } from 'zod'
 import { track } from './analytics'
 import { env } from './env'
+import { getCase } from './cases'
 import { GameError } from './game/engine'
-import { progressSummary } from './game/progress'
-import { hasFreeCase, newPlayer, type Player } from './player'
+import { progressSummary, seasonAt } from './game/progress'
+import { hasFreeCase, newPlayer, type Player, type RecentCase } from './player'
+import { getSeasons } from './seasons'
 import { store } from './store'
 import { ConflictError } from './store/types'
 import { displayName, InitDataError, validateInitData, type InitData } from './telegram/init-data'
@@ -90,17 +92,31 @@ async function roomTag(ctx: unknown): Promise<Record<string, string>> {
   }
 }
 
-export function publicPlayer(p: Player) {
+/** Cases shown under "Recent cases" on the profile. */
+const RECENT_CASES = 10
+
+export async function publicPlayer(p: Player) {
+  const now = Date.now()
+  const seasons = await getSeasons()
+  const [badges, seasonScores, results] = await Promise.all([
+    store().getBadges(p.id),
+    store().seasonScores(p.id, seasonAt(now, seasons)),
+    store().recentResults(p.id, RECENT_CASES),
+  ])
+  const recent = results.flatMap((r): RecentCase[] => {
+    const c = getCase(r.caseId)
+    return c ? [{ caseId: r.caseId, title: c.title, at: r.at, points: r.total, correct: r.correct, rating: r.rating, unrated: r.unrated }] : []
+  })
   return {
     id: p.id,
     name: p.name,
     caseCredits: p.caseCredits,
-    freeCaseAvailable: hasFreeCase(p, Date.now()),
+    freeCaseAvailable: hasFreeCase(p, now),
     items: p.items,
-    badges: p.badges,
+    badges,
     activeBadge: p.activeBadge ?? null,
-    progress: progressSummary(p, Date.now()),
+    progress: progressSummary(p, now, { seasons, seasonScores, recent }),
   }
 }
 
-export type PublicPlayer = ReturnType<typeof publicPlayer>
+export type PublicPlayer = Awaited<ReturnType<typeof publicPlayer>>

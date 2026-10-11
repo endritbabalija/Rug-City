@@ -64,19 +64,19 @@ export interface RoomView {
     | null
 }
 
-export function buildView(state: RoomState, c: CaseFile, playerId: number, now: number): RoomView {
+/** `chats` is this player's `room_chats` messages in this room, by suspect id. */
+export function buildView(state: RoomState, c: CaseFile, playerId: number, now: number, chats: Record<string, ChatMessage[]>): RoomView {
   const inCase = state.seats.includes(playerId)
   const revealed = state.phase === 'reveal'
   const myClueIds = inCase ? cluesFor(state, c, playerId) : []
   const mySuspects = inCase ? suspectsFor(state, c, playerId) : []
   const me = state.players.find((p) => p.id === playerId)
 
-  const chats: RoomView['chats'] = {}
+  const threads: RoomView['chats'] = {}
   for (const suspectId of mySuspects) {
     const suspect = c.suspects.find((s) => s.id === suspectId)!
-    const key = chatKey(playerId, suspectId)
     const opener: ChatMessage = { from: 'suspect', text: suspect.opener, at: state.investigateStartedAt ?? state.phaseStartedAt }
-    chats[suspectId] = { messages: [opener, ...(state.chats[key] ?? [])], subpoenaArmed: !!state.subpoenas[key] }
+    threads[suspectId] = { messages: [opener, ...(chats[suspectId] ?? [])], subpoenaArmed: !!state.subpoenas[chatKey(playerId, suspectId)] }
   }
 
   const wallets: ExplorerWallet[] = c.wallets.map(({ fundedBy, fundingHidden, ...w }) => {
@@ -109,7 +109,7 @@ export function buildView(state: RoomState, c: CaseFile, playerId: number, now: 
     },
     myClues: myClueIds.map((id) => c.clues.find((cl) => cl.id === id)!),
     mySuspects,
-    chats,
+    chats: threads,
     questionsLeft: questionsLeft(state, playerId),
     explorer: { wallets, txs: c.txs },
     hints: c.hints.slice(0, revealed ? c.hints.length : state.hintsRevealed),

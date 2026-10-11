@@ -7,7 +7,7 @@
 import type { CaseFile } from '../cases/types'
 import { utcDay, type Player, type RecentCase } from '../player'
 import { countCorrect, score } from './engine'
-import type { Award, RoomResult, Unrated, Vote } from './types'
+import type { Award, CaseResultRow, RoomResult, Unrated, Vote } from './types'
 
 /** A case only earns points when a real crew played it. */
 export const RATED_MIN_SEATS = 3
@@ -47,25 +47,47 @@ export function rankFor(points: number) {
 
 // ── Seasons ────────────────────────────────────────────────────────────────
 
-export const SEASON_MS = 8 * 7 * 24 * 60 * 60 * 1000
-/** Season 1 starts Monday 5 October 2026, 00:00 UTC. Seasons follow back to back. */
-export const SEASON_EPOCH = Date.UTC(2026, 9, 5)
-
-export function seasonOf(now: number) {
-  return Math.max(1, Math.floor((now - SEASON_EPOCH) / SEASON_MS) + 1)
+/** One row of the `seasons` table. `end` is exclusive. */
+export interface Season {
+  id: number
+  start: number
+  end: number
 }
 
-export function seasonBounds(season: number) {
-  const start = SEASON_EPOCH + (season - 1) * SEASON_MS
-  return { start, end: start + SEASON_MS }
+/** Seasons past the last stored one keep its length, so the calendar never runs out. */
+function extend(last: Season, n: number): Season {
+  const len = last.end - last.start
+  return { id: last.id + n, start: last.end + (n - 1) * len, end: last.end + n * len }
+}
+
+function sorted(seasons: Season[]) {
+  if (!seasons.length) throw new Error('No seasons configured')
+  return [...seasons].sort((a, b) => a.id - b.id)
+}
+
+/** The season running at `now`. Before the first season starts, that's the first season. */
+export function seasonAt(now: number, seasons: Season[]): Season {
+  const list = sorted(seasons)
+  const last = list.at(-1)!
+  if (now >= last.end) return extend(last, Math.floor((now - last.end) / (last.end - last.start)) + 1)
+  return list.find((s) => now < s.end)!
+}
+
+export function seasonById(id: number, seasons: Season[]): Season {
+  const list = sorted(seasons)
+  const last = list.at(-1)!
+  if (id > last.id) return extend(last, id - last.id)
+  const s = list.find((x) => x.id === id)
+  if (!s) throw new Error(`Unknown season ${id}`)
+  return s
 }
 
 export const sumScores = (scores: number[]) => scores.reduce((a, b) => a + b, 0)
 
-/** This season's rating for a player (0 if they haven't played a rated case this season). */
-export function seasonRating(p: Player, now: number) {
-  const scores = p.season?.id === seasonOf(now) ? p.season.scores : []
-  return { rating: sumScores(scores), cases: scores.length }
+/** A season rating from every rated score this season: the sum of the best RATING_BEST_OF. */
+export function seasonRating(scores: number[]) {
+  const best = [...scores].sort((a, b) => b - a).slice(0, RATING_BEST_OF)
+  return { rating: sumScores(best), cases: best.length }
 }
 
 /** Streak as it stands today: it's broken if the last rated case was before yesterday. */
@@ -74,27 +96,32 @@ export function currentStreak(p: Player, now: number) {
   return day === utcDay(now) || day === utcDay(now - 86_400_000) ? (p.streakDays ?? 0) : 0
 }
 
-export function progressSummary(p: Player, now: number) {
+export function progressSummary(p: Player, now: number, from: { seasons: Season[]; seasonScores: number[]; recent: RecentCase[] }) {
   const cluePoints = p.cluePoints ?? 0
-  const season = seasonOf(now)
+  const season = seasonAt(now, from.seasons)
   return {
     cluePoints,
     rank: rankFor(cluePoints),
     streakDays: currentStreak(p, now),
-    season: { id: season, endsAt: seasonBounds(season).end, ...seasonRating(p, now) },
-    recent: p.recent ?? [],
+    season: { id: season.id, endsAt: season.end, ...seasonRating(from.seasonScores) },
+    recent: from.recent,
   }
 }
 
 // ── Awarding ───────────────────────────────────────────────────────────────
 
 export interface CaseOutcome {
+  code: string
   caseFile: CaseFile
   seats: number
   vote: Vote | undefined
   result: RoomResult
   assisted: boolean
   now: number
+  /** The player already has a `case_results` row for this case. */
+  alreadyPlayed: boolean
+  /** The player's rated scores so far this season. */
+  seasonScores: number[]
 }
 
 const NO_POINTS: Award['points'] = { culprit: 0, motive: 0, trail: 0, crew: 0, speed: 0, streak: 0 }
@@ -102,29 +129,51 @@ const NO_POINTS: Award['points'] = { culprit: 0, motive: 0, trail: 0, crew: 0, s
 function unratedReason(p: Player, o: CaseOutcome): Unrated | undefined {
   if (o.seats < RATED_MIN_SEATS) return 'solo'
   if (!o.vote) return 'no-vote'
-  if (p.playedCases?.includes(o.caseFile.id)) return 'replay'
+  if (o.alreadyPlayed) return 'replay'
   if (p.ratedDay === utcDay(o.now) && (p.ratedCount ?? 0) >= RATED_PER_DAY) return 'daily-cap'
   return undefined
 }
 
+/** A player's counters after an award. Applied to the freshest row, so concurrent settles add up. */
+export function applyAward(p: Player, award: Award, now: number): Player {
+  if (award.unrated) return p
+  const today = utcDay(now)
+  return {
+    ...p,
+    cluePoints: (p.cluePoints ?? 0) + award.total,
+    streakDays: award.streakDays,
+    lastRatedDay: today,
+    ratedDay: today,
+    ratedCount: p.ratedDay === today ? (p.ratedCount ?? 0) + 1 : 1,
+  }
+}
+
 /**
- * Settle one finished case for one seated player. Returns the updated player, what
- * they earned, and whether their season rating changed (so the leaderboard needs a write).
+ * Settle one finished case for one seated player. Returns the updated player, what they
+ * earned, the `case_results` row to insert, and whether their season rating changed (so
+ * the leaderboard needs a write). Any finished case is spoiled by the reveal, so the row
+ * is written even when nothing was earned: it makes every later finish a replay.
  */
-export function awardCase(p: Player, o: CaseOutcome): { player: Player; award: Award; ratingChanged: boolean } {
+export function awardCase(p: Player, o: CaseOutcome): { player: Player; award: Award; result: CaseResultRow; ratingChanged: boolean } {
   const c = o.caseFile
   const today = utcDay(o.now)
   const unrated = unratedReason(p, o)
-  // Any finished case is spoiled by the reveal, so it can never be rated later.
-  const playedCases = p.playedCases?.includes(c.id) ? p.playedCases : [...(p.playedCases ?? []), c.id]
   const mine = o.vote ? score(c, o.vote, o.result.elapsedSec) : null
-  const correct = o.vote ? countCorrect(c, o.vote) : 0
-  const recentBase = { caseId: c.id, title: c.title, at: o.now, correct }
+  const row = {
+    roomCode: o.code,
+    playerId: p.id,
+    caseId: c.id,
+    mode: 'crew' as const,
+    seats: o.seats,
+    correct: o.vote ? countCorrect(c, o.vote) : 0,
+    score: mine?.score ?? 0,
+    elapsedSec: o.result.elapsedSec,
+    at: o.now,
+  }
 
   if (unrated || !mine) {
     const award: Award = { unrated: unrated ?? 'no-vote', points: NO_POINTS, total: 0, streakDays: currentStreak(p, o.now) }
-    const recent: RecentCase = { ...recentBase, points: 0, unrated: award.unrated }
-    return { player: { ...p, playedCases, recent: [recent, ...(p.recent ?? [])].slice(0, 10) }, award, ratingChanged: false }
+    return { player: p, award, result: { ...row, points: award.points, total: 0, unrated: award.unrated }, ratingChanged: false }
   }
 
   // Streak: the first rated case of each day extends it (or restarts it at 1) and pays the bonus.
@@ -142,15 +191,12 @@ export function awardCase(p: Player, o: CaseOutcome): { player: Player; award: A
   }
   const total = points.culprit + points.motive + points.trail + points.crew + points.speed + points.streak
   const before = p.cluePoints ?? 0
-  const after = before + total
-  const newRank = rankFor(after)
+  const newRank = rankFor(before + total)
 
   // Season rating: your own accuracy and speed, on cases nobody bought help for.
-  const season = seasonOf(o.now)
-  const oldScores = p.season?.id === season ? p.season.scores : []
-  let scores = oldScores
-  if (!o.assisted) scores = [...oldScores, mine.score].sort((a, b) => b - a).slice(0, RATING_BEST_OF)
-  const ratingChanged = scores.length !== oldScores.length || sumScores(scores) !== sumScores(oldScores)
+  const old = seasonRating(o.seasonScores)
+  const next = o.assisted ? old : seasonRating([...o.seasonScores, mine.score])
+  const ratingChanged = next.rating !== old.rating || next.cases !== old.cases
 
   const award: Award = {
     points,
@@ -160,17 +206,5 @@ export function awardCase(p: Player, o: CaseOutcome): { player: Player; award: A
     streakDays,
     rankUp: newRank.level > rankFor(before).level ? newRank.title : undefined,
   }
-  const recent: RecentCase = { ...recentBase, points: total, rating: award.rating }
-  const player: Player = {
-    ...p,
-    cluePoints: after,
-    streakDays,
-    lastRatedDay: today,
-    ratedDay: today,
-    ratedCount: p.ratedDay === today ? (p.ratedCount ?? 0) + 1 : 1,
-    playedCases,
-    season: { id: season, scores },
-    recent: [recent, ...(p.recent ?? [])].slice(0, 10),
-  }
-  return { player, award, ratingChanged }
+  return { player: applyAward(p, award, o.now), award, result: { ...row, points, total, rating: award.rating }, ratingChanged }
 }

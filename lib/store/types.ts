@@ -1,4 +1,5 @@
-import type { RoomState } from '../game/types'
+import type { Season } from '../game/progress'
+import type { CaseResultRow, ChatMessage, RoomState } from '../game/types'
 import type { Player } from '../player'
 
 export type PurchaseStatus = 'pending' | 'paid' | 'refunded'
@@ -32,12 +33,45 @@ export interface AppEvent {
   at: number
 }
 
+/** One `room_chats` row: a message in a player's private chat with a suspect. */
+export interface ChatRow extends ChatMessage {
+  roomCode: string
+  playerId: number
+  suspectId: string
+  /** Position in this (room, player, suspect) thread, from 0. */
+  seq: number
+}
+
 export interface Store {
   getPlayer(id: number): Promise<Player | null>
   /** Inserts the player unless one with the same id exists; returns whichever is stored. */
   createPlayer(p: Player): Promise<Player>
   /** Read-modify-write with optimistic concurrency. `fn` may throw to abort. */
   updatePlayer(id: number, fn: (p: Player) => Player): Promise<Player>
+
+  getBadges(playerId: number): Promise<string[]>
+  addBadge(playerId: number, badge: string): Promise<void>
+  removeBadge(playerId: number, badge: string): Promise<void>
+
+  hasSeasonReward(season: number, playerId: number): Promise<boolean>
+  /** Returns false if the player already had this season's reward, so it doubles as the claim. */
+  addSeasonReward(season: number, playerId: number): Promise<boolean>
+
+  /** Returns false if this player already has a result for this room. */
+  insertCaseResult(row: CaseResultRow): Promise<boolean>
+  hasPlayed(playerId: number, caseId: string): Promise<boolean>
+  /** Newest first. */
+  recentResults(playerId: number, limit: number): Promise<CaseResultRow[]>
+  /** Every rated score the player finished within the season. */
+  seasonScores(playerId: number, season: Season): Promise<number[]>
+
+  /** A player's suspect chats in one room, in order. */
+  getChats(code: string, playerId: number): Promise<ChatRow[]>
+  appendChat(row: ChatRow): Promise<void>
+  /** Removes the newest message of one thread. */
+  deleteLastChat(code: string, playerId: number, suspectId: string): Promise<void>
+
+  getSeasons(): Promise<Season[]>
 
   /** Returns false if the code is already taken. */
   createRoom(state: RoomState): Promise<boolean>

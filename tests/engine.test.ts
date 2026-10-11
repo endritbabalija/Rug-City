@@ -74,17 +74,17 @@ describe('investigation', () => {
     let s = investigating()
     const mine = engine.suspectsFor(s, mooncat, 1)
     const notMine = mooncat.suspects.map((x) => x.id).find((id) => !mine.includes(id))!
-    expect(code(() => engine.askSuspect(s, mooncat, 1, notMine, 'hi', T0))).toBe('NOT_YOUR_SUSPECT')
+    expect(code(() => engine.askSuspect(s, mooncat, 1, notMine))).toBe('NOT_YOUR_SUSPECT')
 
     for (let i = 0; i < QUESTIONS_PER_PLAYER; i++) {
-      s = engine.askSuspect(s, mooncat, 1, mine[0], `q${i}`, T0).state
-      s = engine.suspectReply(s, 1, mine[0], 'a', T0, false)
+      s = engine.askSuspect(s, mooncat, 1, mine[0]).state
+      s = engine.suspectReply(s, 1, mine[0])
     }
-    expect(code(() => engine.askSuspect(s, mooncat, 1, mine[0], 'one more', T0))).toBe('OUT_OF_QUESTIONS')
+    expect(code(() => engine.askSuspect(s, mooncat, 1, mine[0]))).toBe('OUT_OF_QUESTIONS')
 
     // A subpoena still buys one truthful answer after the cap.
     s = engine.subpoena(s, mooncat, 1, mine[0], T0)
-    const r = engine.askSuspect(s, mooncat, 1, mine[0], 'did you do it?', T0)
+    const r = engine.askSuspect(s, mooncat, 1, mine[0])
     expect(r.subpoenaed).toBe(true)
     expect(r.state.subpoenas[engine.chatKey(1, mine[0])]).toBeUndefined()
   })
@@ -92,16 +92,17 @@ describe('investigation', () => {
   it('refunds a question whose answer failed', () => {
     let s = investigating()
     const suspect = engine.suspectsFor(s, mooncat, 2)[0]
-    s = engine.askSuspect(s, mooncat, 2, suspect, 'hello?', T0).state
+    s = engine.askSuspect(s, mooncat, 2, suspect).state
     expect(engine.questionsLeft(s, 2)).toBe(QUESTIONS_PER_PLAYER - 1)
+    expect(code(() => engine.askSuspect(s, mooncat, 2, suspect))).toBe('WAITING')
     s = engine.refundQuestion(s, 2, suspect, false)
     expect(engine.questionsLeft(s, 2)).toBe(QUESTIONS_PER_PLAYER)
-    expect(s.chats[engine.chatKey(2, suspect)]).toEqual([])
+    expect(s.awaiting?.[engine.chatKey(2, suspect)]).toBeUndefined()
   })
 
   it('reveals traced wallet sources to the whole crew', () => {
     let s = investigating()
-    const hidden = (st: RoomState, pid: number) => buildView(st, mooncat, pid, T0).explorer.wallets.find((w) => w.id === 'fw1')!
+    const hidden = (st: RoomState, pid: number) => buildView(st, mooncat, pid, T0, {}).explorer.wallets.find((w) => w.id === 'fw1')!
     expect(hidden(s, 2).fundedBy).toBeNull()
     s = engine.trace(s, mooncat, 1, 'fw1', T0)
     expect(hidden(s, 2).fundedBy).toContain('FX-44817')
@@ -112,7 +113,7 @@ describe('investigation', () => {
   it('reveals hints in order and stops at the last one', () => {
     let s = investigating()
     for (let i = 0; i < mooncat.hints.length; i++) s = engine.revealHint(s, mooncat, 3, T0)
-    expect(buildView(s, mooncat, 1, T0).hints).toEqual(mooncat.hints)
+    expect(buildView(s, mooncat, 1, T0, {}).hints).toEqual(mooncat.hints)
     expect(code(() => engine.revealHint(s, mooncat, 3, T0))).toBe('NO_MORE_HINTS')
   })
 
@@ -175,8 +176,8 @@ describe('accusation and scoring', () => {
 describe('view projection', () => {
   it('never leaks other players’ clues or the answer before the reveal', () => {
     const s = investigating()
-    const v1 = buildView(s, mooncat, 1, T0)
-    const v2 = buildView(s, mooncat, 2, T0)
+    const v1 = buildView(s, mooncat, 1, T0, {})
+    const v2 = buildView(s, mooncat, 2, T0, {})
     const ids1 = v1.myClues.map((c) => c.id)
     expect(v2.myClues.some((c) => ids1.includes(c.id))).toBe(false)
     expect(v1.result).toBeNull()
@@ -186,7 +187,7 @@ describe('view projection', () => {
   })
 
   it('shows nothing private to someone outside the case', () => {
-    const v = buildView(investigating(), mooncat, 99, T0)
+    const v = buildView(investigating(), mooncat, 99, T0, {})
     expect(v.myClues).toEqual([])
     expect(v.chats).toEqual({})
   })

@@ -54,8 +54,8 @@ export interface RoomState {
   players: RoomPlayer[]
   /** Seat order is fixed when the case starts and drives the clue deal. */
   seats: number[]
-  /** key `${playerId}:${suspectId}` */
-  chats: Record<string, ChatMessage[]>
+  /** key `${playerId}:${suspectId}` -> a question is waiting for its answer. The messages are `room_chats` rows. */
+  awaiting?: Record<string, true>
   questionsUsed: Record<string, number>
   /** key `${playerId}:${suspectId}` -> the next answer from that suspect must be truthful */
   subpoenas: Record<string, boolean>
@@ -86,4 +86,25 @@ export interface Award {
   streakDays: number
   /** New rank title, when this case pushed the player over a threshold. */
   rankUp?: string
+}
+
+/** One `case_results` row: one player's finished room. */
+export interface CaseResultRow {
+  roomCode: string
+  playerId: number
+  caseId: string
+  /** 'legacy' marks rows rebuilt from old player docs by scripts/backfill-v2.mjs. */
+  mode: 'crew' | 'solo' | 'legacy'
+  seats: number
+  /** How many of culprit / motive / trail this player got right. */
+  correct: number
+  /** This player's own case score (0 without a vote). */
+  score: number
+  points: Award['points']
+  total: number
+  /** This case's score toward the season rating, when it counted. */
+  rating?: number
+  elapsedSec?: number
+  unrated?: string
+  at: number
 }

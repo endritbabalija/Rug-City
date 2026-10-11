@@ -1,10 +1,10 @@
 import 'server-only'
 import { randomUUID } from 'node:crypto'
 import { track } from './analytics'
-import { getSku } from './catalog'
+import { getSku, type Grant } from './catalog'
 import { env } from './env'
 import { GameError } from './game/engine'
-import { applyGrant, type Player } from './player'
+import { applyGrant, type BadgeChange, type Player } from './player'
 import { store } from './store'
 import { botApi } from './telegram/bot-api'
 
@@ -23,7 +23,7 @@ export async function createInvoice(player: Player, skuId: string): Promise<{ li
 
   // Local dev without a bot: grant straight away so the full game can be tested in a browser.
   if (cfg.devAuth && !cfg.botToken) {
-    await store().updatePlayer(player.id, (p) => applyGrant(p, sku.grant))
+    await grantTo(player.id, sku.grant)
     return { granted: true }
   }
 
@@ -73,7 +73,7 @@ export async function handleSuccessfulPayment(fromId: number, pay: SuccessfulPay
   if (!purchase) return null
   const sku = getSku(purchase.sku)!
   try {
-    await store().updatePlayer(purchase.userId, (p) => applyGrant(p, sku.grant))
+    await grantTo(purchase.userId, sku.grant)
   } catch (err) {
     // Put it back so Telegram's retry of this update can grant it.
     await store().transitionPurchase(purchase.id, 'paid', 'pending')
@@ -91,6 +91,17 @@ export async function refundCharge(chargeId: string) {
   await botApi('refundStarPayment', { user_id: purchase.userId, telegram_payment_charge_id: chargeId })
   await store().transitionPurchase(purchase.id, 'paid', 'refunded')
   const sku = getSku(purchase.sku)!
-  await store().updatePlayer(purchase.userId, (p) => applyGrant(p, sku.grant, -1))
+  await grantTo(purchase.userId, sku.grant, -1)
   return purchase
+}
+
+/** Apply a grant to a stored player (or take it back with -1): the counters, then the badge row. */
+export async function grantTo(playerId: number, grant: Grant, sign: 1 | -1 = 1) {
+  let badge: BadgeChange | undefined
+  await store().updatePlayer(playerId, (p) => {
+    const r = applyGrant(p, grant, sign)
+    badge = r.badge
+    return r.player
+  })
+  if (badge) await ('add' in badge ? store().addBadge(playerId, badge.add) : store().removeBadge(playerId, badge.remove))
 }

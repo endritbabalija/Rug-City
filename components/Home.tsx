@@ -6,7 +6,7 @@ import { useGame } from './GameContext'
 import { Button, Label, Pill, Stamp, Tape } from './ui'
 
 export function Home() {
-  const { player, cases, badges, go, toast } = useGame()
+  const { player, cases, badges, flags, go, toast } = useGame()
   const [busy, setBusy] = useState<string | null>(null)
   const [code, setCode] = useState('')
 
@@ -23,6 +23,9 @@ export function Home() {
   }
 
   const badge = player.activeBadge ? badges[player.activeBadge] : null
+  const { season } = player.progress
+  // eslint-disable-next-line react-hooks/purity -- a day-granularity countdown; re-render drift doesn't matter
+  const seasonDays = Math.max(0, Math.ceil((season.endsAt - Date.now()) / 86_400_000))
 
   return (
     <div className="pb-10">
@@ -49,6 +52,12 @@ export function Home() {
           <Stamp className="text-lg">Case open</Stamp>
         </div>
       </header>
+
+      {flags.season_banner && (
+        <button onClick={() => go({ name: 'leaderboard' })} className="mx-5 mb-3 block w-[calc(100%-2.5rem)] rounded-md border border-tape/50 bg-ink-2 px-4 py-2 text-left font-mono text-xs text-tape">
+          🏆 Season {season.id} ends in {seasonDays} {seasonDays === 1 ? 'day' : 'days'} ›
+        </button>
+      )}
 
       <section className="mx-5 flex flex-wrap items-center gap-2 border-y border-line py-3">
         {player.freeCaseAvailable ? <Pill tone="ok">● Free case today</Pill> : <Pill>Free case used</Pill>}

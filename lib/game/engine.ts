@@ -8,7 +8,6 @@ import {
   MAX_PLAYERS,
   MIN_PLAYERS,
   QUESTIONS_PER_PLAYER,
-  type ChatMessage,
   type RoomResult,
   type RoomState,
   type Vote,
@@ -106,7 +105,7 @@ export function createRoom(
     phaseStartedAt: now,
     players: [{ ...host, ready: false, joinedAt: now }],
     seats: [],
-    chats: {},
+    awaiting: {},
     questionsUsed: {},
     subpoenas: {},
     traced: [],
@@ -205,14 +204,15 @@ export function questionsLeft(state: RoomState, playerId: number) {
   return Math.max(0, QUESTIONS_PER_PLAYER - (state.questionsUsed[String(playerId)] ?? 0))
 }
 
-/** Records the player's question. Returns whether the answer must be truthful. */
+/**
+ * Counts the player's question and marks the chat as waiting for an answer. Returns whether
+ * the answer must be truthful. The caller stores the message itself (`room_chats`).
+ */
 export function askSuspect(
   state: RoomState,
   c: CaseFile,
   actorId: number,
   suspectId: string,
-  text: string,
-  now: number,
 ): { state: RoomState; subpoenaed: boolean } {
   requireMember(state, actorId)
   requirePhase(state, 'investigate')
@@ -220,29 +220,31 @@ export function askSuspect(
   const key = chatKey(actorId, suspectId)
   const subpoenaed = !!state.subpoenas[key]
   if (!subpoenaed && questionsLeft(state, actorId) <= 0) fail('OUT_OF_QUESTIONS', "You're out of questions. A Subpoena still gets you one true answer.", 409)
-  const history = state.chats[key] ?? []
-  if (history.at(-1)?.from === 'player') fail('WAITING', 'Wait for an answer first.', 409)
-  const msg: ChatMessage = { from: 'player', text, at: now, subpoena: subpoenaed || undefined }
+  if (state.awaiting?.[key]) fail('WAITING', 'Wait for an answer first.', 409)
   const questionsUsed = subpoenaed
     ? state.questionsUsed
     : { ...state.questionsUsed, [String(actorId)]: (state.questionsUsed[String(actorId)] ?? 0) + 1 }
   const subpoenas = { ...state.subpoenas }
   delete subpoenas[key]
-  return { state: { ...state, chats: { ...state.chats, [key]: [...history, msg] }, questionsUsed, subpoenas }, subpoenaed }
+  return { state: { ...state, awaiting: { ...state.awaiting, [key]: true }, questionsUsed, subpoenas }, subpoenaed }
 }
 
-export function suspectReply(state: RoomState, actorId: number, suspectId: string, text: string, now: number, subpoenaed: boolean): RoomState {
-  const key = chatKey(actorId, suspectId)
-  const history = state.chats[key] ?? []
-  return { ...state, chats: { ...state.chats, [key]: [...history, { from: 'suspect', text, at: now, subpoena: subpoenaed || undefined }] } }
+function stopAwaiting(state: RoomState, key: string): RoomState {
+  const awaiting = { ...state.awaiting }
+  delete awaiting[key]
+  return { ...state, awaiting }
+}
+
+/** The suspect's answer was stored, so the player can ask again. */
+export function suspectReply(state: RoomState, actorId: number, suspectId: string): RoomState {
+  return stopAwaiting(state, chatKey(actorId, suspectId))
 }
 
 /** Undo a question whose answer could not be produced, so the player isn't charged for it. */
 export function refundQuestion(state: RoomState, actorId: number, suspectId: string, subpoenaed: boolean): RoomState {
   const key = chatKey(actorId, suspectId)
-  const history = state.chats[key] ?? []
-  if (history.at(-1)?.from !== 'player') return state
-  const next = { ...state, chats: { ...state.chats, [key]: history.slice(0, -1) } }
+  if (!state.awaiting?.[key]) return state
+  const next = stopAwaiting(state, key)
   if (subpoenaed) return { ...next, subpoenas: { ...next.subpoenas, [key]: true } }
   return { ...next, questionsUsed: { ...next.questionsUsed, [String(actorId)]: Math.max(0, (next.questionsUsed[String(actorId)] ?? 1) - 1) } }
 }
