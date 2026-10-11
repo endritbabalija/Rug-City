@@ -10,6 +10,7 @@
     "test": "vitest run",
     "bot:setup": "node --env-file-if-exists=.env.local scripts/setup-bot.mjs",
     "preview:point": "node scripts/point-preview.mjs",
+    "playtest:readout": "node --conditions=react-server --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --env-file-if-exists=.env.local scripts/playtest-readout.mjs",
     "lint": "eslint ."
   },
   "dependencies": {
