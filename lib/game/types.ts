@@ -92,6 +92,8 @@ export interface RoomState {
   caseId: string
   /** Missing on rooms created before solo rooms existed: those are 'crew'. */
   mode?: CaseMode
+  /** An admin's free test of a case in review: no charge, no points, no result row. */
+  playtest?: boolean
   hostId: number
   createdAt: number
   phase: Phase

@@ -91,6 +91,15 @@ function caseCharge() {
   ] as const
 }
 
+/** An admin's free, unrated solo run of any stored case, including ones still in review. */
+export async function createPlaytest(player: Player, caseId: string) {
+  // Checked here too, not only in the route: a playtest skips the charge.
+  if (!env().adminIds.includes(player.id)) throw new GameError('FORBIDDEN', 'Admins only.', 403)
+  const c = await requireCase(caseId)
+  const room = await insertRoom((code) => engine.createSoloRoom(code, c, { id: player.id, name: player.name, badge: badgeOf(player) }, Date.now(), { playtest: true }))
+  return room.code
+}
+
 /** A solo case with Dex: charged like hosting, refunded if the room can't be created. */
 export async function createSolo(player: Player, caseId: string) {
   const c = await requireHostable(player, caseId)
@@ -317,6 +326,8 @@ export async function settleAfter(state: RoomState) {
     return { ...s, rewardsSettled: true }
   })
   if (!claimed) return settled
+  // A playtest pays nobody and doesn't count as a play of the case.
+  if (settled.playtest) return store().updateRoom(state.code, (s) => ({ ...s, awards: {} }))
 
   const caseFile = await requireCase(settled.caseId)
   const now = Date.now()

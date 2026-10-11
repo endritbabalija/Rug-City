@@ -9,6 +9,7 @@ import { dealClues, dealSuspects } from '@/lib/game/engine'
 delete process.env.NEXT_PUBLIC_SUPABASE_URL
 const { BUILT_IN_CASES, listCases } = await import('@/lib/cases')
 const { caseSchema } = await import('@/lib/cases/schema')
+const { staticProblems, suggestTargetSec } = await import('@/lib/cases/checks')
 const CASES = await listCases()
 
 describe('the repository', () => {
@@ -19,6 +20,30 @@ describe('the repository', () => {
   it.each(BUILT_IN_CASES.map((c) => [c.id, c] as const))('%s passes the case schema', (_id, c) => {
     const parsed = caseSchema.safeParse(c)
     expect(parsed.error?.issues ?? []).toEqual([])
+  })
+
+  it.each(BUILT_IN_CASES.map((c) => [c.id, c] as const))('%s passes the pipeline static checks', (_id, c) => {
+    expect(staticProblems(c)).toEqual([])
+  })
+})
+
+describe('the pipeline static checks', () => {
+  const [c] = BUILT_IN_CASES
+
+  it('catch a single seat holding a whole proof', () => {
+    // Three places apart, so the first seat of a 3-seat table gets both proof clues.
+    const [a, b] = c.culpritProofs[0]
+    const rest = c.dealOrder.filter((id) => id !== a && id !== b)
+    const bad = { ...c, dealOrder: [a, rest[0], rest[1], b, ...rest.slice(2)] }
+    expect(staticProblems(bad)).toContain(`3 seats: seat 1 alone holds the proof ${a}+${b}`)
+  })
+
+  it('catch answers that point nowhere', () => {
+    expect(staticProblems({ ...c, answer: { ...c.answer, culprit: 'nobody' } })).toContain('answer.culprit "nobody" is not a suspect id')
+  })
+
+  it('suggest a target time from clues and suspects', () => {
+    expect(suggestTargetSec({ clues: Array(11), suspects: Array(5) } as never)).toBe(1140)
   })
 })
 

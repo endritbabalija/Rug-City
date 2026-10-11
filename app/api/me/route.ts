@@ -5,7 +5,7 @@ import { caseBoard } from '@/lib/cases'
 import { badgeInfo, BADGES, SKUS } from '@/lib/catalog'
 import { flag } from '@/lib/flags'
 import { GameError } from '@/lib/game/engine'
-import { authenticate, publicPlayer, route } from '@/lib/server'
+import { authenticate, isAdmin, publicPlayer, route } from '@/lib/server'
 import { store } from '@/lib/store'
 
 export const GET = route(async (req) => {
@@ -28,6 +28,7 @@ export const GET = route(async (req) => {
     skus: SKUS,
     badges: badgeMap(pub.badges),
     flags: { season_banner: seasonBanner, solo, dex_crew: dexCrew, districts },
+    isAdmin: isAdmin(player.id),
   })
 })
 

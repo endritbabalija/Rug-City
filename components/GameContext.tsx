@@ -11,6 +11,8 @@ export type Screen =
   | { name: 'profile' }
   | { name: 'leaderboard' }
   | { name: 'district'; id: string }
+  | { name: 'admin' }
+  | { name: 'adminCase'; id: string }
   | { name: 'room'; code: string }
 
 export interface GameCtx {
@@ -28,6 +30,8 @@ export interface GameCtx {
   badges: Record<string, { name: string; icon: string }>
   /** Feature flags the client needs (lib/flags.ts). */
   flags: { season_banner: boolean; solo: boolean; dex_crew: boolean; districts: boolean }
+  /** In ADMIN_TELEGRAM_IDS: sees the case review screen. */
+  isAdmin: boolean
   go: (s: Screen) => void
   toast: (text: string, tone?: 'info' | 'error' | 'ok') => void
   /** Buys an item with Stars and resolves true once it's in the inventory. */

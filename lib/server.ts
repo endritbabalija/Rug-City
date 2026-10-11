@@ -64,6 +64,15 @@ export async function authenticate(req: Request): Promise<Session> {
   return { player, init }
 }
 
+export const isAdmin = (playerId: number) => env().adminIds.includes(playerId)
+
+/** `authenticate`, then 403 unless the player is in ADMIN_TELEGRAM_IDS. */
+export async function authenticateAdmin(req: Request): Promise<Session> {
+  const session = await authenticate(req)
+  if (!isAdmin(session.player.id)) throw new GameError('FORBIDDEN', 'Admins only.', 403)
+  return session
+}
+
 /**
  * The light path for frequent reads (room polling): verifies the init data and returns the
  * user id, without loading or updating the player.

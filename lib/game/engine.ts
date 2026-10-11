@@ -131,9 +131,16 @@ export function createRoom(
 }
 
 /** A solo case: the player and Dex are seated straight away and the room opens on the briefing. */
-export function createSoloRoom(code: string, c: CaseFile, player: { id: number; name: string; badge?: string }, now: number): RoomState {
+export function createSoloRoom(
+  code: string,
+  c: CaseFile,
+  player: { id: number; name: string; badge?: string },
+  now: number,
+  opts: { playtest?: boolean } = {},
+): RoomState {
   const room = createRoom(code, c, player, now)
-  return log(setPhase({ ...room, mode: 'solo', seats: [player.id, DEX_ID], dexShared: [], dexMessages: [] }, 'briefing', now), player.id, 'The case file is open.', now)
+  const solo: RoomState = { ...room, mode: 'solo', seats: [player.id, DEX_ID], dexShared: [], dexMessages: [], ...(opts.playtest && { playtest: true }) }
+  return log(setPhase(solo, 'briefing', now), player.id, opts.playtest ? 'Playtest: nothing is charged or recorded.' : 'The case file is open.', now)
 }
 
 export function join(state: RoomState, player: { id: number; name: string; badge?: string }, now: number): RoomState {
