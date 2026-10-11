@@ -3,6 +3,7 @@ import { mooncat } from '@/lib/cases/mooncat'
 import * as engine from '@/lib/game/engine'
 import { GameError } from '@/lib/game/engine'
 import { ACCUSE_GRACE_MS, INVESTIGATE_MS, QUESTIONS_PER_PLAYER, type RoomState } from '@/lib/game/types'
+import { NO_HELP } from '@/lib/game/scoring'
 import { buildView } from '@/lib/game/view'
 
 const T0 = 1_000_000
@@ -137,7 +138,7 @@ describe('accusation and scoring', () => {
     s = engine.castVote(s, mooncat, 3, right, T0 + 9 * 60_000)
     expect(s.phase).toBe('reveal')
     expect(s.result!.correct).toEqual({ culprit: true, motive: true, trail: true })
-    // Under 10 minutes of investigating gets the full time bonus.
+    // Under the case's target time gets the full time points.
     expect(s.result!.score).toBe(120)
   })
 
@@ -163,13 +164,43 @@ describe('accusation and scoring', () => {
     expect(code(() => engine.castVote(s, mooncat, 1, { ...right, culprit: 'nobody' }, T0))).toBe('BAD_VOTE')
   })
 
-  it('scales the time bonus and only grants it for the right culprit', () => {
-    expect(engine.timeBonus(5 * 60)).toBe(20)
-    expect(engine.timeBonus(10 * 60)).toBe(20)
-    expect(engine.timeBonus(17.5 * 60)).toBe(10)
-    expect(engine.timeBonus(30 * 60)).toBe(0)
-    expect(engine.score(mooncat, { ...right, culprit: 'gary' }, 60).points.time).toBe(0)
-    expect(engine.score(mooncat, { ...right, motive: 'payroll' }, 60).score).toBe(95)
+  it('scores time against the target and only grants it for the right culprit', () => {
+    expect(engine.score(mooncat, { ...right, culprit: 'gary' }, 60, 900, NO_HELP).points.time).toBe(0)
+    expect(engine.score(mooncat, { ...right, motive: 'payroll' }, 60, 900, NO_HELP).score).toBe(95)
+    expect(engine.score(mooncat, right, 1350, 900, NO_HELP).points.time).toBe(10)
+  })
+
+  it('uses the target time it is given when the vote ends the case', () => {
+    let s = engine.callVote(investigating(), 1, T0)
+    const end = T0 + 1000 + 30 * 60_000
+    s = engine.castVote(s, mooncat, 1, right, end, 3600)
+    s = engine.castVote(s, mooncat, 2, right, end, 3600)
+    s = engine.castVote(s, mooncat, 3, right, end, 3600)
+    expect(s.result).toMatchObject({ targetSec: 3600, score: 120 })
+
+    // Without one, the case's own target: 30 minutes is twice the 15-minute target, so no time points.
+    let d = engine.castVote(engine.callVote(investigating(), 1, T0), mooncat, 1, right, end)
+    d = engine.closeVote(d, mooncat, 1, end)
+    expect(d.result).toMatchObject({ targetSec: mooncat.targetSec, points: { time: 0 }, score: 100 })
+  })
+
+  it('counts every use of help and cuts the whole crew’s score', () => {
+    let s = investigating()
+    s = engine.revealHint(s, mooncat, 3, T0)
+    s = engine.trace(s, mooncat, 1, 'fw1', T0)
+    s = engine.subpoena(s, mooncat, 2, engine.suspectsFor(s, mooncat, 2)[0], T0)
+    expect(s.help).toEqual({ hint: 1, trace: 1, subpoena: 1, dexHint: 0 })
+    s = engine.callVote(s, 1, T0)
+    for (const id of [1, 2, 3]) s = engine.castVote(s, mooncat, id, right, T0 + 60_000)
+    expect(s.result).toMatchObject({ penalty: 0.5, score: 60, points: { culprit: 50, motive: 25, trail: 25, time: 20 } })
+  })
+
+  it('treats rooms from before v2 scoring as crew rooms without help', () => {
+    const old = investigating()
+    delete old.mode
+    delete old.help
+    expect(engine.roomMode(old)).toBe('crew')
+    expect(engine.revealHint(old, mooncat, 1, T0).help).toEqual({ ...NO_HELP, hint: 1 })
   })
 })
 

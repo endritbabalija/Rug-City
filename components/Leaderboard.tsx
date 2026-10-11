@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { api, ApiError } from '@/lib/client/api'
-import { ELITE_SHARE, RATED_MIN_SEATS, RATING_BEST_OF, TOP_PRIZE_COUNT } from '@/lib/game/progress'
+import { ELITE_SHARE, RATING_BEST_OF, TOP_PRIZE_COUNT } from '@/lib/game/progress'
 import { useGame } from './GameContext'
 import { Label, Tape } from './ui'
 
@@ -81,7 +81,7 @@ export function Leaderboard() {
                   You&apos;re <b className="text-tape">#{board.me}</b> of {board.total.toLocaleString()} with a rating of {player.progress.season.rating}.
                 </>
               ) : (
-                `You are not ranked yet. Finish a case with a crew of ${RATED_MIN_SEATS}+ without power-ups.`
+                'You are not ranked yet. Finish a case to get on the board.'
               )}
             </p>
           )}

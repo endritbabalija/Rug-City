@@ -3,6 +3,8 @@
 import { useEffect } from 'react'
 import { api } from '@/lib/client/api'
 import { UNRATED_REASON } from '@/lib/game/progress'
+import { CASE_MAX, CASE_POINTS, HELP_PENALTY, HELP_PENALTY_CAP, PENALIZE_CLUE_POINTS } from '@/lib/game/scoring'
+import type { Help } from '@/lib/game/types'
 import type { PublicPlayer } from '@/lib/server'
 import { canShareStory, haptic, shareStory, shareToChat } from '@/lib/telegram/webapp'
 import { useGame } from '../GameContext'
@@ -11,6 +13,9 @@ import { Button, Label, Stamp, Tape } from '../ui'
 
 /** If points still haven't arrived this long after the verdict, stop waiting for them. */
 const SETTLE_WAIT_MS = 30_000
+
+const HELP_LABEL: Record<keyof Help, string> = { hint: 'Hint', trace: 'Trace', subpoena: 'Subpoena', dexHint: 'Dex hint' }
+const pct = (share: number) => `${Math.round(share * 100)}%`
 
 export function Reveal({ room, now }: PhaseProps) {
   const { go, setPlayer } = useGame()
@@ -23,6 +28,11 @@ export function Reveal({ room, now }: PhaseProps) {
   const minutes = Math.max(1, Math.round(r.elapsedSec / 60))
   const headline = caught ? `Our crew caught the rugger in ${minutes} min` : 'The rugger got away'
   const appLink = inviteLink('').replace(/\?(startapp|room)=$/, '')
+  const before = r.points.culprit + r.points.motive + r.points.trail + r.points.time
+  const helpLines = (Object.keys(HELP_LABEL) as (keyof Help)[])
+    .filter((k) => r.help[k] > 0)
+    .map((k) => ({ key: k, text: `${HELP_LABEL[k]} used${r.help[k] > 1 ? ` ×${r.help[k]}` : ''}`, cut: r.help[k] * HELP_PENALTY[k] }))
+  const capped = helpLines.reduce((sum, l) => sum + l.cut, 0) > HELP_PENALTY_CAP
 
   useEffect(() => {
     if (caught) haptic.ok()
@@ -52,13 +62,13 @@ export function Reveal({ room, now }: PhaseProps) {
 
   const suspect = (id: string) => c.suspects.find((s) => s.id === id)
   const rows = [
-    { label: 'Who did it', pts: r.points.culprit, max: 50, ok: r.correct.culprit, you: suspect(r.group.culprit)?.name, truth: suspect(r.answer.culprit)?.name },
-    { label: 'Why', pts: r.points.motive, max: 25, ok: r.correct.motive, you: c.motives.find((m) => m.id === r.group.motive)?.text, truth: c.motives.find((m) => m.id === r.answer.motive)?.text },
-    { label: 'The money', pts: r.points.trail, max: 25, ok: r.correct.trail, you: c.trails.find((t) => t.id === r.group.trail)?.text, truth: c.trails.find((t) => t.id === r.answer.trail)?.text },
+    { label: 'Who did it', pts: r.points.culprit, max: CASE_POINTS.culprit, ok: r.correct.culprit, you: suspect(r.group.culprit)?.name, truth: suspect(r.answer.culprit)?.name },
+    { label: 'Why', pts: r.points.motive, max: CASE_POINTS.motive, ok: r.correct.motive, you: c.motives.find((m) => m.id === r.group.motive)?.text, truth: c.motives.find((m) => m.id === r.answer.motive)?.text },
+    { label: 'The money', pts: r.points.trail, max: CASE_POINTS.trail, ok: r.correct.trail, you: c.trails.find((t) => t.id === r.group.trail)?.text, truth: c.trails.find((t) => t.id === r.answer.trail)?.text },
   ]
 
   function storyShare() {
-    shareStory(`${window.location.origin}/api/verdict/${room.code}`, `${headline} 🕵️ ${r.score}/120 on “${c.title}”. #WhoRugged`, {
+    shareStory(`${window.location.origin}/api/verdict/${room.code}`, `${headline} 🕵️ ${r.score}/${CASE_MAX} on “${c.title}”. #WhoRugged`, {
       url: appLink,
       name: 'Play Who Rugged?',
     })
@@ -75,9 +85,35 @@ export function Reveal({ room, now }: PhaseProps) {
         </h2>
         <div className="mt-6 animate-rise font-mono text-7xl font-semibold text-tape tabular-nums" style={{ animationDelay: '450ms' }}>
           {r.score}
-          <span className="text-2xl text-dim">/120</span>
+          <span className="text-2xl text-dim">/{CASE_MAX}</span>
         </div>
-        <p className="mt-1 font-mono text-xs text-dim">time bonus +{r.points.time}</p>
+        <p className="mt-1 font-mono text-xs text-dim">
+          time +{r.points.time} · target {Math.round(r.targetSec / 60)} min
+        </p>
+        {helpLines.length > 0 && (
+          <dl className="mx-auto mt-4 max-w-64 animate-rise space-y-0.5 font-mono text-xs" style={{ animationDelay: '500ms' }}>
+            <div className="flex justify-between text-dim">
+              <dt>Before help</dt>
+              <dd>{before}</dd>
+            </div>
+            {helpLines.map((l) => (
+              <div key={l.key} className="flex justify-between text-rug">
+                <dt>{l.text}</dt>
+                <dd>−{pct(l.cut)}</dd>
+              </div>
+            ))}
+            {capped && (
+              <div className="flex justify-between text-dim">
+                <dt>Penalty capped at</dt>
+                <dd>−{pct(HELP_PENALTY_CAP)}</dd>
+              </div>
+            )}
+            <div className="flex justify-between border-t border-line pt-0.5 font-semibold text-paper">
+              <dt>Final score</dt>
+              <dd>{r.score}</dd>
+            </div>
+          </dl>
+        )}
       </div>
 
       {(award || waiting) && (
@@ -103,9 +139,9 @@ export function Reveal({ room, now }: PhaseProps) {
                 ))}
               </div>
               <p className="mt-3 text-xs text-dim">
-                {award.assisted
-                  ? 'Power-ups were used, so this case does not count toward season ratings.'
-                  : `Case score ${award.rating}/120 goes toward your season Detective Rating.`}
+                Your case score {award.rating}/{CASE_MAX} goes toward your season Detective Rating.
+                {r.penalty > 0 &&
+                  ` Help cost the crew ${pct(r.penalty)} of ${PENALIZE_CLUE_POINTS ? 'the score and of your vote and speed points' : 'the score'}.`}
               </p>
               {award.rankUp && (
                 <div className="mt-4 text-center">
@@ -186,7 +222,7 @@ export function Reveal({ room, now }: PhaseProps) {
         <Button
           variant={canShareStory() ? 'ghost' : 'primary'}
           className="w-full"
-          onClick={() => shareToChat(appLink, `🕵️ ${headline} on “${c.title}” · ${r.score}/120. Think your crew is faster?`)}
+          onClick={() => shareToChat(appLink, `🕵️ ${headline} on “${c.title}” · ${r.score}/${CASE_MAX}. Think your crew is faster?`)}
         >
           Send to a chat
         </Button>

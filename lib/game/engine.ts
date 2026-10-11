@@ -2,12 +2,15 @@
 // one (or throws GameError), so the same logic runs against any store and is unit-tested.
 
 import type { CaseFile } from '../cases/types'
+import { caseScore, NO_HELP } from './scoring'
 import {
   ACCUSE_GRACE_MS,
   INVESTIGATE_MS,
   MAX_PLAYERS,
   MIN_PLAYERS,
   QUESTIONS_PER_PLAYER,
+  type CaseMode,
+  type Help,
   type RoomResult,
   type RoomState,
   type Vote,
@@ -51,6 +54,14 @@ function log(state: RoomState, playerId: number, text: string, now: number): Roo
 
 function nameOf(state: RoomState, playerId: number) {
   return state.players.find((p) => p.id === playerId)?.name ?? 'Someone'
+}
+
+export const roomMode = (state: RoomState): CaseMode => state.mode ?? 'crew'
+export const roomHelp = (state: RoomState): Help => ({ ...NO_HELP, ...state.help })
+
+function addHelp(state: RoomState, kind: keyof Help): RoomState {
+  const help = roomHelp(state)
+  return { ...state, help: { ...help, [kind]: help[kind] + 1 } }
 }
 
 // ── Dealing ────────────────────────────────────────────────────────────────
@@ -99,6 +110,7 @@ export function createRoom(
   return {
     code,
     caseId: c.id,
+    mode: 'crew',
     hostId: host.id,
     createdAt: now,
     phase: 'lobby',
@@ -110,6 +122,7 @@ export function createRoom(
     subpoenas: {},
     traced: [],
     hintsRevealed: 0,
+    help: { ...NO_HELP },
     feed: [],
     votes: {},
   }
@@ -176,7 +189,7 @@ export function revealHint(state: RoomState, c: CaseFile, actorId: number, now: 
   requireMember(state, actorId)
   requirePhase(state, 'investigate')
   if (state.hintsRevealed >= c.hints.length) fail('NO_MORE_HINTS', 'All hints for this case are already revealed.', 409)
-  return log({ ...state, hintsRevealed: state.hintsRevealed + 1, assisted: true }, actorId, `${nameOf(state, actorId)} used a Hint.`, now)
+  return log({ ...addHelp(state, 'hint'), hintsRevealed: state.hintsRevealed + 1 }, actorId, `${nameOf(state, actorId)} used a Hint.`, now)
 }
 
 export function trace(state: RoomState, c: CaseFile, actorId: number, walletId: string, now: number): RoomState {
@@ -185,7 +198,7 @@ export function trace(state: RoomState, c: CaseFile, actorId: number, walletId: 
   const wallet = c.wallets.find((w) => w.id === walletId)
   if (!wallet) fail('UNKNOWN_WALLET', 'No such wallet.', 404)
   if (!wallet!.fundingHidden || state.traced.includes(walletId)) fail('ALREADY_KNOWN', "That wallet's source is already visible.", 409)
-  return log({ ...state, traced: [...state.traced, walletId], assisted: true }, actorId, `${nameOf(state, actorId)} traced ${wallet!.address}.`, now)
+  return log({ ...addHelp(state, 'trace'), traced: [...state.traced, walletId] }, actorId, `${nameOf(state, actorId)} traced ${wallet!.address}.`, now)
 }
 
 export function subpoena(state: RoomState, c: CaseFile, actorId: number, suspectId: string, now: number): RoomState {
@@ -195,7 +208,7 @@ export function subpoena(state: RoomState, c: CaseFile, actorId: number, suspect
   const key = chatKey(actorId, suspectId)
   if (state.subpoenas[key]) fail('ALREADY_SUBPOENAED', 'Your subpoena on this suspect is still waiting for a question.', 409)
   const suspect = c.suspects.find((s) => s.id === suspectId)!
-  return log({ ...state, subpoenas: { ...state.subpoenas, [key]: true }, assisted: true }, actorId, `${nameOf(state, actorId)} subpoenaed ${suspect.name}.`, now)
+  return log({ ...addHelp(state, 'subpoena'), subpoenas: { ...state.subpoenas, [key]: true } }, actorId, `${nameOf(state, actorId)} subpoenaed ${suspect.name}.`, now)
 }
 
 // ── Interrogation ──────────────────────────────────────────────────────────
@@ -251,7 +264,8 @@ export function refundQuestion(state: RoomState, actorId: number, suspectId: str
 
 // ── Accusation & scoring ───────────────────────────────────────────────────
 
-export function castVote(state: RoomState, c: CaseFile, actorId: number, vote: Vote, now: number): RoomState {
+/** `targetSec` is the case's target time in this room's mode (`targetFor`), used if this vote ends the case. */
+export function castVote(state: RoomState, c: CaseFile, actorId: number, vote: Vote, now: number, targetSec = c.targetSec): RoomState {
   requireMember(state, actorId)
   requirePhase(state, 'accuse')
   if (!c.suspects.some((s) => s.id === vote.culprit)) fail('BAD_VOTE', 'Unknown suspect.')
@@ -259,16 +273,16 @@ export function castVote(state: RoomState, c: CaseFile, actorId: number, vote: V
   if (!c.trails.some((t) => t.id === vote.trail)) fail('BAD_VOTE', 'Unknown money trail.')
   const next = { ...state, votes: { ...state.votes, [String(actorId)]: vote } }
   const everyone = state.players.every((p) => next.votes[String(p.id)])
-  return everyone ? finalize(next, c, now) : next
+  return everyone ? finalize(next, c, now, targetSec) : next
 }
 
-export function closeVote(state: RoomState, c: CaseFile, actorId: number, now: number): RoomState {
+export function closeVote(state: RoomState, c: CaseFile, actorId: number, now: number, targetSec = c.targetSec): RoomState {
   requireMember(state, actorId)
   requirePhase(state, 'accuse')
   if (Object.keys(state.votes).length === 0) fail('NO_VOTES', 'Nobody has voted yet.', 409)
   const grace = now - state.phaseStartedAt >= ACCUSE_GRACE_MS
   if (actorId !== state.hostId && !grace) fail('HOST_ONLY', 'Only the host can close the vote early.', 403)
-  return finalize(state, c, now)
+  return finalize(state, c, now, targetSec)
 }
 
 function plurality(votes: string[], order: string[], tiebreak?: string): string {
@@ -279,34 +293,21 @@ function plurality(votes: string[], order: string[], tiebreak?: string): string 
   return tiebreak && tied.includes(tiebreak) ? tiebreak : tied[0]
 }
 
-export function timeBonus(elapsedSec: number) {
-  // Full 20 points up to 10 minutes, sliding to 0 at 25 minutes.
-  const minutes = elapsedSec / 60
-  return Math.max(0, Math.min(20, Math.round((20 * (25 - minutes)) / 15)))
-}
-
 /** How many of culprit, motive and money trail a vote got right (0–3). */
 export function countCorrect(c: CaseFile, vote: Vote) {
   return Number(vote.culprit === c.answer.culprit) + Number(vote.motive === c.answer.motive) + Number(vote.trail === c.answer.trail)
 }
 
-export function score(c: CaseFile, group: Vote, elapsedSec: number): RoomResult {
+export function score(c: CaseFile, group: Vote, elapsedSec: number, targetSec: number, help: Help): RoomResult {
   const correct = {
     culprit: group.culprit === c.answer.culprit,
     motive: group.motive === c.answer.motive,
     trail: group.trail === c.answer.trail,
   }
-  const points = {
-    culprit: correct.culprit ? 50 : 0,
-    motive: correct.motive ? 25 : 0,
-    trail: correct.trail ? 25 : 0,
-    // The time bonus only counts when the group caught the right person.
-    time: correct.culprit ? timeBonus(elapsedSec) : 0,
-  }
-  return { group, correct, points, score: points.culprit + points.motive + points.trail + points.time, elapsedSec }
+  return { group, correct, ...caseScore(correct, elapsedSec, targetSec, help), elapsedSec, targetSec, help }
 }
 
-function finalize(state: RoomState, c: CaseFile, now: number): RoomState {
+function finalize(state: RoomState, c: CaseFile, now: number, targetSec: number): RoomState {
   const votes = Object.values(state.votes)
   const host = state.votes[String(state.hostId)]
   const group: Vote = {
@@ -315,5 +316,5 @@ function finalize(state: RoomState, c: CaseFile, now: number): RoomState {
     trail: plurality(votes.map((v) => v.trail), c.trails.map((t) => t.id), host?.trail),
   }
   const elapsedSec = Math.round((now - (state.investigateStartedAt ?? state.phaseStartedAt)) / 1000)
-  return { ...setPhase(state, 'reveal', now), result: score(c, group, elapsedSec) }
+  return { ...setPhase(state, 'reveal', now), result: score(c, group, elapsedSec, targetSec, roomHelp(state)) }
 }

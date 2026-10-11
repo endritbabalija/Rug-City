@@ -2,7 +2,7 @@
 // is not shared between serverless instances, so production must use Supabase.
 
 import type { Season } from '../game/progress'
-import type { CaseResultRow, RoomState } from '../game/types'
+import type { CaseResultRow, CaseStats, RoomState } from '../game/types'
 import type { Player } from '../player'
 import type { AppEvent, ChatRow, Purchase, PurchaseStatus, SeasonRating, Store } from './types'
 
@@ -35,6 +35,7 @@ export function createMemoryStore(): Store {
   const ratings = new Map<string, SeasonRating>()
   const events: AppEvent[] = []
   const flags: Record<string, boolean> = {}
+  const caseStats = new Map<string, CaseStats>()
   const ranked = (season: number) => [...ratings.values()].filter((r) => r.season === season && r.rating > 0).sort(byStanding)
 
   return {
@@ -105,6 +106,16 @@ export function createMemoryStore(): Store {
 
     async getSeasons() {
       return clone(SEASON_SEED)
+    },
+
+    async getCaseStats(caseId, mode) {
+      const row = caseStats.get(`${caseId}:${mode}`)
+      return row ? clone(row) : null
+    },
+    async bumpPlays(caseId, mode) {
+      const key = `${caseId}:${mode}`
+      const row = caseStats.get(key) ?? { caseId, mode, plays: 0, updatedAt: 0 }
+      caseStats.set(key, { ...row, plays: row.plays + 1, updatedAt: Date.now() })
     },
 
     async createRoom(state) {

@@ -1,5 +1,5 @@
 import type { Season } from '../game/progress'
-import type { CaseResultRow, ChatMessage, RoomState } from '../game/types'
+import type { CaseMode, CaseResultRow, CaseStats, ChatMessage, RoomState } from '../game/types'
 import type { Player } from '../player'
 
 export type PurchaseStatus = 'pending' | 'paid' | 'refunded'
@@ -72,6 +72,10 @@ export interface Store {
   deleteLastChat(code: string, playerId: number, suspectId: string): Promise<void>
 
   getSeasons(): Promise<Season[]>
+
+  getCaseStats(caseId: string, mode: CaseMode): Promise<CaseStats | null>
+  /** Counts one finished room of a case in a mode, creating its row on the first play. */
+  bumpPlays(caseId: string, mode: CaseMode): Promise<void>
 
   /** Returns false if the code is already taken. */
   createRoom(state: RoomState): Promise<boolean>

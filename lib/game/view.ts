@@ -1,5 +1,6 @@
 import type { CaseFile, Clue, Option, Tx, Wallet } from '../cases/types'
 import { chatKey, cluesFor, countCorrect, questionsLeft, suspectsFor } from './engine'
+import { NO_HELP } from './scoring'
 import { ACCUSE_GRACE_MS, INVESTIGATE_MS, type Award, type ChatMessage, type FeedItem, type Phase, type RoomResult, type Vote } from './types'
 import type { RoomState } from './types'
 
@@ -59,7 +60,6 @@ export interface RoomView {
         /** What this player earned; null until the room has settled. */
         myAward: Award | null
         settled: boolean
-        assisted: boolean
       })
     | null
 }
@@ -120,6 +120,10 @@ export function buildView(state: RoomState, c: CaseFile, playerId: number, now: 
       revealed && state.result
         ? {
             ...state.result,
+            // Results from before help penalties have no help, penalty or target.
+            help: { ...NO_HELP, ...state.result.help },
+            penalty: state.result.penalty ?? 0,
+            targetSec: state.result.targetSec ?? c.targetSec,
             answer: c.answer,
             reveal: c.reveal,
             crew: state.players
@@ -131,7 +135,6 @@ export function buildView(state: RoomState, c: CaseFile, playerId: number, now: 
             myAward: state.awards?.[String(playerId)] ?? null,
             /** Points are settled; a missing award then means none was recorded (e.g. a pre-points room). */
             settled: !!state.awards,
-            assisted: !!state.assisted,
           }
         : null,
   }

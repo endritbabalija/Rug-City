@@ -342,4 +342,6 @@ export const airdrop: CaseFile = {
     'The next morning she bragged about a "+92k $FROG scalp" from that same wallet.',
     'CryptoKiki was a victim who trusted a pinned message. glitchpenguin was on a plane. Marco broke promises but didn\'t steal.',
   ],
+  // 15 minutes until playtests give a better number.
+  targetSec: 900,
 }

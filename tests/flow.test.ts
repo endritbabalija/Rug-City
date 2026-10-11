@@ -27,6 +27,7 @@ const { newPlayer } = await import('@/lib/player')
 const season = await import('@/lib/season')
 const { currentSeason } = await import('@/lib/seasons')
 const ai = await import('@/lib/ai/suspect')
+const { MEDIAN_AFTER_PLAYS } = await import('@/lib/game/scoring')
 
 async function mkPlayer(id: number, referredBy?: number) {
   return store().createPlayer(newPlayer({ id, name: `P${id}` }, Date.now(), referredBy))
@@ -209,7 +210,7 @@ describe('Clue Points', () => {
     expect((await fresh(b)).cluePoints).toBe(55)
   })
 
-  it('ranks unassisted cases on the season leaderboard and leaves power-up cases off it', async () => {
+  it('ranks every finished case on the season leaderboard, with help lowering the rating', async () => {
     const [host, a, b, x, y, z] = ids(6)
     for (const id of [host, a, b, x, y, z]) await mkPlayer(id)
     await playThrough(await lobbyWith(host, [a, b]), host, { [host]: ANSWER, [a]: WRONG, [b]: ANSWER })
@@ -223,12 +224,14 @@ describe('Clue Points', () => {
     for (const id of [x, y, z]) await rooms.act(assisted, await fresh(id), { type: 'vote', vote: ANSWER })
 
     expect((await fresh(y)).cluePoints).toBeGreaterThan(0)
-    expect((await rooms.viewRoom(assisted, await fresh(y))).result?.myAward).toMatchObject({ assisted: true, rating: undefined })
+    const aided = (await rooms.viewRoom(assisted, await fresh(y))).result!
+    expect(aided).toMatchObject({ help: { hint: 1, trace: 0, subpoena: 0, dexHint: 0 }, penalty: 0.1, score: 108 })
+    expect(aided.myAward).toMatchObject({ rating: 108 })
 
     const board = await season.leaderboard(await fresh(a))
     const ranked = (await store().getSeasonLeaderboard(board.season, 50)).rows.map((r) => r.playerId)
-    expect(ranked).toEqual(expect.arrayContaining([host, a, b]))
-    expect(ranked).not.toContain(y)
+    expect(ranked).toEqual(expect.arrayContaining([host, a, b, x, y, z]))
+    expect(ranked.indexOf(y)).toBeGreaterThan(ranked.indexOf(host))
     expect(ranked.indexOf(a)).toBeGreaterThan(ranked.indexOf(b))
     expect(board.me).toBe(ranked.indexOf(a) + 1)
     // Telegram ids never reach the client, only which row is yours.
@@ -236,17 +239,43 @@ describe('Clue Points', () => {
     expect(JSON.stringify(board)).not.toContain(`"playerId"`)
   })
 
-  it("doesn't rate an admin playing alone", async () => {
+  it('rates a one-seat room like any other', async () => {
     const [admin] = ids(1)
     await mkPlayer(admin)
     process.env.ADMIN_TELEGRAM_IDS = String(admin)
     try {
       const code = await lobbyWith(admin, [])
       await playThrough(code, admin, { [admin]: ANSWER })
-      expect((await rooms.viewRoom(code, await fresh(admin))).result?.myAward?.unrated).toBe('solo')
-      expect((await fresh(admin)).cluePoints ?? 0).toBe(0)
+      const award = (await rooms.viewRoom(code, await fresh(admin))).result?.myAward
+      expect(award?.unrated).toBeUndefined()
+      expect(award?.rating).toBe(120)
+      expect((await fresh(admin)).cluePoints).toBe(award?.total)
     } finally {
       delete process.env.ADMIN_TELEGRAM_IDS
+    }
+  })
+
+  it('counts each finished room once toward its case and mode', async () => {
+    const before = (await store().getCaseStats('mooncat-exit', 'crew'))?.plays ?? 0
+    const [host, a, b] = ids(3)
+    for (const id of [host, a, b]) await mkPlayer(id)
+    const code = await lobbyWith(host, [a, b])
+    await playThrough(code, host, { [host]: ANSWER, [a]: ANSWER, [b]: WRONG })
+    await rooms.settleAfter((await store().getRoom(code))!)
+    expect((await store().getCaseStats('mooncat-exit', 'crew'))?.plays).toBe(before + 1)
+    expect(await store().getCaseStats('mooncat-exit', 'solo')).toBeNull()
+  })
+
+  it('scores against the median once the mode has enough plays', async () => {
+    const spy = vi.spyOn(store(), 'getCaseStats').mockResolvedValue({ caseId: 'mooncat-exit', mode: 'crew', plays: MEDIAN_AFTER_PLAYS, medianSec: 3600, updatedAt: 0 })
+    try {
+      const [host, a, b] = ids(3)
+      for (const id of [host, a, b]) await mkPlayer(id)
+      const code = await lobbyWith(host, [a, b])
+      await playThrough(code, host, { [host]: ANSWER, [a]: ANSWER, [b]: ANSWER })
+      expect((await rooms.viewRoom(code, await fresh(host))).result?.targetSec).toBe(3600)
+    } finally {
+      spy.mockRestore()
     }
   })
 

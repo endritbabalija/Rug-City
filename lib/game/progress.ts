@@ -7,10 +7,9 @@
 import type { CaseFile } from '../cases/types'
 import { utcDay, type Player, type RecentCase } from '../player'
 import { countCorrect, score } from './engine'
-import type { Award, CaseResultRow, RoomResult, Unrated, Vote } from './types'
+import { applyPenalty, CASE_POINTS, PENALIZE_CLUE_POINTS } from './scoring'
+import type { Award, CaseMode, CaseResultRow, RoomResult, Unrated, Vote } from './types'
 
-/** A case only earns points when a real crew played it. */
-export const RATED_MIN_SEATS = 3
 /** Rated cases per player per UTC day, against farming. */
 export const RATED_PER_DAY = 6
 /** The season rating is the sum of a player's best this-many case scores. */
@@ -25,14 +24,12 @@ export const POINTS = { culprit: 30, motive: 15, trail: 15, crew: 10, speedMax: 
 
 export const RANKS = [
   { title: 'Rookie', at: 0 },
-  { title: 'Sleuth', at: 250 },
-  { title: 'Inspector', at: 1000 },
-  { title: 'Chief Inspector', at: 3000 },
-  { title: 'Chief', at: 7500 },
+  { title: 'Inspector', at: 500 },
+  { title: 'Chief', at: 2500 },
+  { title: 'Legend', at: 10_000 },
 ] as const
 
 export const UNRATED_REASON: Record<Unrated, string> = {
-  solo: `Cases need a crew of ${RATED_MIN_SEATS} or more to count.`,
   'no-vote': "You didn't vote, so this one doesn't count.",
   replay: 'You already finished this case, so replays earn nothing.',
   'daily-cap': `That's ${RATED_PER_DAY} rated cases today. Points resume tomorrow.`,
@@ -113,10 +110,11 @@ export function progressSummary(p: Player, now: number, from: { seasons: Season[
 export interface CaseOutcome {
   code: string
   caseFile: CaseFile
+  mode: CaseMode
   seats: number
   vote: Vote | undefined
+  /** The crew's verdict; it carries the target time and the room's help. */
   result: RoomResult
-  assisted: boolean
   now: number
   /** The player already has a `case_results` row for this case. */
   alreadyPlayed: boolean
@@ -127,7 +125,6 @@ export interface CaseOutcome {
 const NO_POINTS: Award['points'] = { culprit: 0, motive: 0, trail: 0, crew: 0, speed: 0, streak: 0 }
 
 function unratedReason(p: Player, o: CaseOutcome): Unrated | undefined {
-  if (o.seats < RATED_MIN_SEATS) return 'solo'
   if (!o.vote) return 'no-vote'
   if (o.alreadyPlayed) return 'replay'
   if (p.ratedDay === utcDay(o.now) && (p.ratedCount ?? 0) >= RATED_PER_DAY) return 'daily-cap'
@@ -158,12 +155,12 @@ export function awardCase(p: Player, o: CaseOutcome): { player: Player; award: A
   const c = o.caseFile
   const today = utcDay(o.now)
   const unrated = unratedReason(p, o)
-  const mine = o.vote ? score(c, o.vote, o.result.elapsedSec) : null
+  const mine = o.vote ? score(c, o.vote, o.result.elapsedSec, o.result.targetSec, o.result.help) : null
   const row = {
     roomCode: o.code,
     playerId: p.id,
     caseId: c.id,
-    mode: 'crew' as const,
+    mode: o.mode,
     seats: o.seats,
     correct: o.vote ? countCorrect(c, o.vote) : 0,
     score: mine?.score ?? 0,
@@ -181,28 +178,29 @@ export function awardCase(p: Player, o: CaseOutcome): { player: Player; award: A
   const streakDays = firstToday ? (p.lastRatedDay === utcDay(o.now - 86_400_000) ? (p.streakDays ?? 0) + 1 : 1) : (p.streakDays ?? 1)
 
   const crewCaught = o.result.correct.culprit
+  // Help cuts the case parts; the crew and streak bonuses stay whole.
+  const cut = (n: number) => (PENALIZE_CLUE_POINTS ? applyPenalty(n, o.result.penalty) : n)
   const points: Award['points'] = {
-    culprit: mine.correct.culprit ? POINTS.culprit : 0,
-    motive: mine.correct.motive ? POINTS.motive : 0,
-    trail: mine.correct.trail ? POINTS.trail : 0,
+    culprit: cut(mine.correct.culprit ? POINTS.culprit : 0),
+    motive: cut(mine.correct.motive ? POINTS.motive : 0),
+    trail: cut(mine.correct.trail ? POINTS.trail : 0),
     crew: crewCaught ? POINTS.crew : 0,
-    speed: crewCaught ? Math.round((o.result.points.time / 20) * POINTS.speedMax) : 0,
+    speed: cut(crewCaught ? Math.round((o.result.points.time / CASE_POINTS.time) * POINTS.speedMax) : 0),
     streak: firstToday ? Math.min(POINTS.streakMax, POINTS.streakPerDay * streakDays) : 0,
   }
   const total = points.culprit + points.motive + points.trail + points.crew + points.speed + points.streak
   const before = p.cluePoints ?? 0
   const newRank = rankFor(before + total)
 
-  // Season rating: your own accuracy and speed, on cases nobody bought help for.
+  // Season rating: your own accuracy and speed, after the room's help penalty.
   const old = seasonRating(o.seasonScores)
-  const next = o.assisted ? old : seasonRating([...o.seasonScores, mine.score])
+  const next = seasonRating([...o.seasonScores, mine.score])
   const ratingChanged = next.rating !== old.rating || next.cases !== old.cases
 
   const award: Award = {
     points,
     total,
-    rating: o.assisted ? undefined : mine.score,
-    assisted: o.assisted || undefined,
+    rating: mine.score,
     streakDays,
     rankUp: newRank.level > rankFor(before).level ? newRank.title : undefined,
   }
