@@ -27,6 +27,7 @@ export function Leaderboard() {
   }, [])
 
   const mineVisible = board?.rows.some((r) => r.me)
+  // eslint-disable-next-line react-hooks/purity -- a day-granularity countdown; re-render drift doesn't matter
   const daysLeft = board ? Math.max(0, Math.ceil((board.end - Date.now()) / 86_400_000)) : 0
 
   return (
@@ -77,7 +78,7 @@ export function Leaderboard() {
             <p className="mt-4 rounded-md border border-line px-4 py-3 text-sm">
               {board.me ? (
                 <>
-                  You're <b className="text-tape">#{board.me}</b> of {board.total.toLocaleString()} with a rating of {player.progress.season.rating}.
+                  You&apos;re <b className="text-tape">#{board.me}</b> of {board.total.toLocaleString()} with a rating of {player.progress.season.rating}.
                 </>
               ) : (
                 `You are not ranked yet. Finish a case with a crew of ${RATED_MIN_SEATS}+ without power-ups.`

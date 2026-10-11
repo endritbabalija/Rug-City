@@ -1,6 +1,7 @@
 import 'server-only'
 import { randomInt } from 'node:crypto'
 import { suspectReply } from './ai/suspect'
+import { track } from './analytics'
 import { getCase } from './cases'
 import type { CaseFile } from './cases/types'
 import type { ItemKey } from './catalog'
@@ -115,7 +116,7 @@ export async function act(code: string, player: Player, action: RoomAction) {
     case 'start': {
       const minPlayers = minPlayersFor(player.id)
       let usedFree = false
-      return chargedStep(
+      const started = await chargedStep(
         code,
         player,
         (p) => {
@@ -125,6 +126,8 @@ export async function act(code: string, player: Player, action: RoomAction) {
         (p) => (usedFree ? { ...p, freeCaseDay: undefined } : { ...p, caseCredits: p.caseCredits + 1 }),
         (s, _c, now) => engine.start(s, player.id, now, minPlayers),
       )
+      track('case_start', player.id, { caseId: started.caseId, seats: started.seats.length, code })
+      return started
     }
     case 'ready':
       return mutate(code, (s, _c, now) => engine.ready(s, player.id, now))
@@ -159,7 +162,7 @@ export async function ask(code: string, player: Player, suspectId: string, text:
 
   let reply: string
   try {
-    reply = await suspectReply(caseFile, suspect, asked.chats[engine.chatKey(player.id, suspectId)] ?? [], subpoenaed)
+    reply = await suspectReply(caseFile, suspect, asked.chats[engine.chatKey(player.id, suspectId)] ?? [], subpoenaed, player.id)
   } catch (err) {
     await store().updateRoom(code, (s) => engine.refundQuestion(s, player.id, suspectId, subpoenaed))
     throw err
@@ -233,5 +236,13 @@ async function settleSeat(room: RoomState, caseFile: CaseFile, id: number, now: 
       console.error('Referral bonus failed', referrer, err)
     }
   }
+  const vote = room.votes[String(id)]
+  track('case_finish', id, {
+    caseId: room.caseId,
+    code: room.code,
+    correct: vote ? engine.countCorrect(caseFile, vote) : 0,
+    total: award!.total,
+    unrated: award!.unrated ?? null,
+  })
   return award!
 }

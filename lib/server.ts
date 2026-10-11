@@ -1,6 +1,8 @@
 import 'server-only'
+import * as Sentry from '@sentry/nextjs'
 import { NextResponse } from 'next/server'
 import { ZodError } from 'zod'
+import { track } from './analytics'
 import { env } from './env'
 import { GameError } from './game/engine'
 import { progressSummary } from './game/progress'
@@ -46,13 +48,16 @@ export async function authenticate(req: Request): Promise<Session> {
     const startParam = init ? init.startParam : (req.headers.get('x-start-param') ?? undefined)
     const room = startParam ? await db.getRoom(startParam.toUpperCase()) : null
     player = await db.createPlayer(newPlayer(profile, Date.now(), room?.hostId))
+    if (player.referredBy) track('invite_joined', player.id, { referrer: player.referredBy })
   } else if (player.name !== profile.name || player.photoUrl !== profile.photoUrl) {
     player = await db.updatePlayer(profile.id, (p) => ({ ...p, name: profile.name, username: profile.username, photoUrl: profile.photoUrl }))
   }
+  // Sentry gives each request its own scope, so this tags only this request's errors.
+  Sentry.setTag('player', player.id)
   return { player, init }
 }
 
-export function errorResponse(err: unknown) {
+export function errorResponse(err: unknown, tags: Record<string, string> = {}) {
   if (err instanceof GameError) return NextResponse.json({ error: { code: err.code, message: err.message } }, { status: err.status })
   if (err instanceof InitDataError)
     return NextResponse.json({ error: { code: 'UNAUTHORIZED', message: err.message } }, { status: 401 })
@@ -61,6 +66,7 @@ export function errorResponse(err: unknown) {
   if (err instanceof ConflictError)
     return NextResponse.json({ error: { code: 'BUSY', message: 'Lots happening at once, try again.' } }, { status: 409 })
   console.error(err)
+  Sentry.captureException(err, { tags })
   return NextResponse.json({ error: { code: 'SERVER', message: 'Something went wrong.' } }, { status: 500 })
 }
 
@@ -69,8 +75,18 @@ export function route<Ctx>(fn: (req: Request, ctx: Ctx) => Promise<Response>) {
     try {
       return await fn(req, ctx)
     } catch (err) {
-      return errorResponse(err)
+      return errorResponse(err, await roomTag(ctx))
     }
+  }
+}
+
+/** The room code from a `[code]` route's params, as a Sentry tag. */
+async function roomTag(ctx: unknown): Promise<Record<string, string>> {
+  try {
+    const params = await (ctx as { params?: Promise<{ code?: unknown }> } | undefined)?.params
+    return typeof params?.code === 'string' ? { room: params.code.toUpperCase() } : {}
+  } catch {
+    return {}
   }
 }
 

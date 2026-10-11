@@ -60,6 +60,7 @@ export function Game() {
   const setPlayer = useCallback((player: PublicPlayer) => setMe((m) => (m ? { ...m, player } : m)), [])
 
   const buy = useCallback(
+    // eslint-disable-next-line react-hooks/preserve-manual-memoization -- existing code; deps are correct
     async (skuId: string) => {
       try {
         const res = await api<{ link: string } | { granted: true }>('/api/payments/invoice', { sku: skuId })

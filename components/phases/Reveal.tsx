@@ -141,7 +141,7 @@ export function Reveal({ room, now }: PhaseProps) {
       </section>
 
       <section className="mt-8 px-5">
-        <Label>The crew's votes</Label>
+        <Label>The crew&apos;s votes</Label>
         <ol className="mt-2 divide-y divide-line rounded-md border border-line bg-ink-2">
           {r.crew.map((p) => (
             <li key={p.id} className="flex items-center gap-3 px-4 py-2.5">

@@ -320,3 +320,25 @@ describe('Stars payments', () => {
     await expect(payments.refundCharge('ch_1')).rejects.toThrow(/refunded/)
   })
 })
+
+describe('events', () => {
+  it('records the start and every seat finishing a case', async () => {
+    const [host, a, b] = ids(3)
+    for (const id of [host, a, b]) await mkPlayer(id)
+    const code = await lobbyWith(host, [a, b])
+    const write = vi.spyOn(store(), 'trackEvents')
+    try {
+      await playThrough(code, host, { [host]: ANSWER, [a]: ANSWER, [b]: WRONG })
+      await new Promise((r) => setTimeout(r, 0))
+      const events = write.mock.calls.flatMap(([batch]) => batch).filter((e) => e.props.code === code)
+      expect(events.filter((e) => e.name === 'case_start')).toEqual([
+        expect.objectContaining({ playerId: host, props: { caseId: 'mooncat-exit', seats: 3, code } }),
+      ])
+      const finishes = events.filter((e) => e.name === 'case_finish')
+      expect(finishes.map((e) => e.playerId).sort()).toEqual([host, a, b].sort())
+      expect(finishes.find((e) => e.playerId === b)?.props).toEqual({ caseId: 'mooncat-exit', code, correct: 2, total: 55, unrated: null })
+    } finally {
+      write.mockRestore()
+    }
+  })
+})

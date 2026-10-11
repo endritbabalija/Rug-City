@@ -1,5 +1,6 @@
 import 'server-only'
 import Anthropic from '@anthropic-ai/sdk'
+import { track } from '../analytics'
 import type { CaseFile, Suspect } from '../cases/types'
 import { env } from '../env'
 import type { ChatMessage } from '../game/types'
@@ -50,8 +51,9 @@ function fallbackReply(s: Suspect, history: ChatMessage[], subpoenaed: boolean) 
 /**
  * Produce the suspect's next reply. `history` excludes the scripted opener and ends
  * with the player's question. Falls back to scripted lines so a case is always playable.
+ * Every call to the model is tracked as `ai_call` for `playerId`.
  */
-export async function suspectReply(c: CaseFile, s: Suspect, history: ChatMessage[], subpoenaed: boolean): Promise<string> {
+export async function suspectReply(c: CaseFile, s: Suspect, history: ChatMessage[], subpoenaed: boolean, playerId: number): Promise<string> {
   const cfg = env()
   if (!cfg.anthropicKey) return fallbackReply(s, history, subpoenaed)
 
@@ -62,6 +64,20 @@ export async function suspectReply(c: CaseFile, s: Suspect, history: ChatMessage
   ]
   if (subpoenaed) messages.push({ role: 'system', content: SUBPOENA_NOTE })
 
+  let usage: Anthropic.Usage | undefined
+  const logCall = (fallback: boolean) =>
+    track('ai_call', playerId, {
+      model: cfg.suspectModel,
+      inputTokens: usage?.input_tokens ?? null,
+      outputTokens: usage?.output_tokens ?? null,
+      cacheRead: usage?.cache_read_input_tokens ?? null,
+      fallback,
+    })
+  const fallback = () => {
+    logCall(true)
+    return fallbackReply(s, history, subpoenaed)
+  }
+
   try {
     const response = await anthropic().messages.create({
       model: cfg.suspectModel,
@@ -70,17 +86,20 @@ export async function suspectReply(c: CaseFile, s: Suspect, history: ChatMessage
       messages,
       output_config: { effort: 'low' },
     })
-    if (response.stop_reason === 'refusal') return fallbackReply(s, history, subpoenaed)
+    usage = response.usage
+    if (response.stop_reason === 'refusal') return fallback()
     const text = response.content
       .flatMap((b) => (b.type === 'text' ? [b.text] : []))
       .join(' ')
       .trim()
-    return text ? text.slice(0, 600) : fallbackReply(s, history, subpoenaed)
+    if (!text) return fallback()
+    logCall(false)
+    return text.slice(0, 600)
   } catch (err) {
     if (err instanceof Anthropic.RateLimitError) console.warn('Suspect chat rate limited')
     else if (err instanceof Anthropic.APIConnectionError) console.warn('Suspect chat connection error')
     else if (err instanceof Anthropic.APIError) console.error('Suspect chat API error', err.status, err.message)
     else throw err
-    return fallbackReply(s, history, subpoenaed)
+    return fallback()
   }
 }

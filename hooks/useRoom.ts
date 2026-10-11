@@ -64,6 +64,7 @@ export function useRoom(code: string, onPlayer: (p: PublicPlayer) => void) {
   )
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial fetch; state is set after the request resolves
     void refresh()
     const timer = setInterval(() => {
       if (document.visibilityState === 'visible') void refresh()

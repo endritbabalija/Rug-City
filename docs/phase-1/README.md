@@ -45,7 +45,7 @@ Agents update this table at the end of each session.
 
 | # | Status | Branch | PR | Notes |
 | --- | --- | --- | --- | --- |
-| 0 | Not started | | | |
+| 0 | Built, not committed | `phase1/00-foundation` | | Local checks pass; events checked on a local dev server. Still to do: apply `0003` to staging, set up the staging bot and Sentry, check `app_open` and a test error on staging, then PR and green CI |
 | 1 | Not started | | | |
 | 2 | Not started | | | |
 | 3 | Not started | | | |
