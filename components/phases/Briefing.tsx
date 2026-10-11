@@ -47,7 +47,9 @@ export function Briefing({ room, run, busy }: PhaseProps) {
           ))}
         </div>
         <p className="mt-4 text-sm text-dim">
-          Next, each of you gets different evidence and one or two suspects will message you privately. Nobody can solve it alone.
+          {room.mode === 'solo'
+            ? 'Next, you and Detective Dex split the evidence. Some suspects will message you privately; ask Dex for what he has.'
+            : 'Next, each of you gets different evidence and one or two suspects will message you privately. Nobody can solve it alone.'}
         </p>
       </section>
 

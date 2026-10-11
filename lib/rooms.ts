@@ -1,5 +1,6 @@
 import 'server-only'
 import { randomInt } from 'node:crypto'
+import { dexLine, fallbackDexLine } from './ai/dex'
 import { suspectReply } from './ai/suspect'
 import { track } from './analytics'
 import { getCase } from './cases'
@@ -9,9 +10,10 @@ import { badgeInfo } from './catalog'
 import { env } from './env'
 import * as engine from './game/engine'
 import { GameError } from './game/engine'
+import * as dex from './game/dex'
 import { applyAward, awardCase, REFERRAL_POINTS, seasonRating } from './game/progress'
 import { targetFor } from './game/scoring'
-import type { Award, ChatMessage, RoomState, Vote } from './game/types'
+import { DEX_ID, type Award, type ChatMessage, type RoomState, type Vote } from './game/types'
 import { buildView } from './game/view'
 import { applyGrant, consumeCase, hasFreeCase, spendItem, type Player } from './player'
 import { currentSeason } from './seasons'
@@ -49,13 +51,46 @@ function minPlayersFor(hostId: number) {
 
 const badgeOf = (p: Player) => (p.activeBadge ? badgeInfo(p.activeBadge)?.icon : undefined)
 
-export async function createRoom(player: Player, caseId: string) {
-  const c = requireCase(caseId)
+/** Store a new room under a fresh code. */
+async function insertRoom(make: (code: string) => RoomState) {
   for (let i = 0; i < 5; i++) {
-    const state = engine.createRoom(newCode(), c, { id: player.id, name: player.name, badge: badgeOf(player) }, Date.now())
-    if (await store().createRoom(state)) return state.code
+    const state = make(newCode())
+    if (await store().createRoom(state)) return state
   }
   throw new Error('Could not allocate a room code')
+}
+
+export async function createRoom(player: Player, caseId: string) {
+  const c = requireCase(caseId)
+  return (await insertRoom((code) => engine.createRoom(code, c, { id: player.id, name: player.name, badge: badgeOf(player) }, Date.now()))).code
+}
+
+/** Today's free case or a case credit, and the matching refund. */
+function caseCharge() {
+  let usedFree = false
+  return [
+    (p: Player) => {
+      usedFree = hasFreeCase(p, Date.now())
+      return consumeCase(p, Date.now())
+    },
+    (p: Player) => (usedFree ? { ...p, freeCaseDay: undefined } : { ...p, caseCredits: p.caseCredits + 1 }),
+  ] as const
+}
+
+/** A solo case with Dex: charged like hosting, refunded if the room can't be created. */
+export async function createSolo(player: Player, caseId: string) {
+  const c = requireCase(caseId)
+  const [charge, refund] = caseCharge()
+  await store().updatePlayer(player.id, charge)
+  let room: RoomState
+  try {
+    room = await insertRoom((code) => engine.createSoloRoom(code, c, { id: player.id, name: player.name, badge: badgeOf(player) }, Date.now()))
+  } catch (err) {
+    await store().updatePlayer(player.id, refund)
+    throw err
+  }
+  track('case_start', player.id, { caseId: c.id, mode: 'solo', seats: 1, code: room.code })
+  return room.code
 }
 
 /** A player's suspect chats in a room, by suspect id. */
@@ -65,7 +100,7 @@ async function loadChats(code: string, playerId: number) {
   return threads
 }
 
-export async function viewRoom(code: string, player: Player) {
+export async function viewRoom(code: string, player: Pick<Player, 'id'>) {
   const [{ room, caseFile }, chats] = await Promise.all([loadRoom(code), loadChats(code, player.id)])
   return { ...buildView(room, caseFile, player.id, Date.now(), chats), member: engine.isMember(room, player.id), minPlayers: minPlayersFor(room.hostId) }
 }
@@ -124,6 +159,7 @@ export type RoomAction =
   | { type: 'hint' }
   | { type: 'trace'; walletId: string }
   | { type: 'subpoena'; suspectId: string }
+  | { type: 'askDex'; ask: dex.DexAsk }
 
 export async function act(code: string, player: Player, action: RoomAction) {
   const me = { id: player.id, name: player.name, badge: badgeOf(player) }
@@ -134,18 +170,8 @@ export async function act(code: string, player: Player, action: RoomAction) {
       return mutate(code, (s, _c, now) => engine.leave(s, player.id, now))
     case 'start': {
       const minPlayers = minPlayersFor(player.id)
-      let usedFree = false
-      const started = await chargedStep(
-        code,
-        player,
-        (p) => {
-          usedFree = hasFreeCase(p, Date.now())
-          return consumeCase(p, Date.now())
-        },
-        (p) => (usedFree ? { ...p, freeCaseDay: undefined } : { ...p, caseCredits: p.caseCredits + 1 }),
-        (s, _c, now) => engine.start(s, player.id, now, minPlayers),
-      )
-      track('case_start', player.id, { caseId: started.caseId, seats: started.seats.length, code })
+      const started = await chargedStep(code, player, ...caseCharge(), (s, _c, now) => engine.start(s, player.id, now, minPlayers))
+      track('case_start', player.id, { caseId: started.caseId, mode: engine.roomMode(started), seats: started.seats.length, code })
       return started
     }
     case 'ready':
@@ -168,7 +194,46 @@ export async function act(code: string, player: Player, action: RoomAction) {
       return chargedStep(code, player, ...itemCharge('trace'), (s, c, now) => engine.trace(s, c, player.id, action.walletId, now))
     case 'subpoena':
       return chargedStep(code, player, ...itemCharge('subpoena'), (s, c, now) => engine.subpoena(s, c, player.id, action.suspectId, now))
+    case 'askDex':
+      return askDex(code, player, action.ask)
   }
+}
+
+/** Dex hands over his next clue or a hint, then says something about it. */
+async function askDex(code: string, player: Player, ask: dex.DexAsk) {
+  const { caseFile } = await loadRoom(code)
+  let clueId: string | undefined
+  let hint: string | undefined
+  const room = await store().updateRoom(code, (s) => {
+    const now = Date.now()
+    if (ask === 'clue') {
+      const r = dex.shareNextClue(s, caseFile, player.id, now)
+      clueId = r.clueId
+      return r.state
+    }
+    const r = dex.dexHint(s, caseFile, player.id, now)
+    hint = r.hint
+    return r.state
+  })
+  track('dex_ask', player.id, { ask, caseId: caseFile.id, code })
+
+  // The clue or hint is already the player's; his line is only flavour, so a failure falls back to the script.
+  const clueById = (id: string) => caseFile.clues.find((cl) => cl.id === id)!
+  const last = (await store().recentResults(player.id, 2).catch(() => [])).find((r) => r.roomCode !== code)
+  const lastCase = last && getCase(last.caseId) ? { title: getCase(last.caseId)!.title, correct: last.correct } : undefined
+  const moment = {
+    ask,
+    clue: clueId ? clueById(clueId) : undefined,
+    hint,
+    hints: caseFile.hints.slice(0, room.hintsRevealed),
+    sharedCount: room.dexShared?.length ?? 0,
+    lastCase,
+  }
+  const text = await dexLine(caseFile, dex.dexHand(room, caseFile).map(clueById), moment, player.id).catch((err) => {
+    console.error('Dex line failed', code, err)
+    return fallbackDexLine(moment)
+  })
+  return store().updateRoom(code, (s) => dex.dexSay(s, { ask, text, at: Date.now(), clueId, hint }))
 }
 
 export async function ask(code: string, player: Player, suspectId: string, text: string) {
@@ -231,7 +296,7 @@ export async function settleAfter(state: RoomState) {
     .catch((err) => console.error('Case plays count failed', settled.code, err))
   const awards: Record<string, Award> = {}
   await Promise.all(
-    settled.seats.map(async (id) => {
+    humanSeats(settled).map(async (id) => {
       try {
         const award = await settleSeat(settled, caseFile, id, now)
         if (award) awards[String(id)] = award
@@ -242,6 +307,9 @@ export async function settleAfter(state: RoomState) {
   )
   return store().updateRoom(state.code, (s) => ({ ...s, awards: { ...s.awards, ...awards } }))
 }
+
+/** Seats held by players, without Dex. */
+const humanSeats = (room: RoomState) => room.seats.filter((id) => id !== DEX_ID)
 
 /** Settles one seat; returns null if this room was already settled for them. */
 async function settleSeat(room: RoomState, caseFile: CaseFile, id: number, now: number): Promise<Award | null> {
@@ -256,7 +324,7 @@ async function settleSeat(room: RoomState, caseFile: CaseFile, id: number, now: 
     code: room.code,
     caseFile,
     mode: engine.roomMode(room),
-    seats: room.seats.length,
+    seats: humanSeats(room).length,
     vote: room.votes[String(id)],
     result: room.result!,
     now,

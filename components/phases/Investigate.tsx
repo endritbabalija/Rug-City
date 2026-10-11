@@ -3,13 +3,14 @@
 import { useState } from 'react'
 import { haptic } from '@/lib/telegram/webapp'
 import { ClueCard } from '../evidence/ClueCard'
+import { DexPanel } from '../evidence/DexPanel'
 import { Explorer } from '../evidence/Explorer'
 import { Interrogation } from '../evidence/Interrogation'
 import { useGame } from '../GameContext'
 import type { PhaseProps } from '../Room'
 import { Button, Countdown, Label } from '../ui'
 
-type Tab = 'clues' | 'explorer' | 'suspects' | 'board'
+type Tab = 'clues' | 'dex' | 'explorer' | 'suspects' | 'board'
 
 export function Investigate(props: PhaseProps) {
   const { room, run, busy, now } = props
@@ -26,6 +27,7 @@ export function Investigate(props: PhaseProps) {
 
   const tabs: { id: Tab; label: string; badge?: number }[] = [
     { id: 'clues', label: 'My clues', badge: room.myClues.length },
+    ...(room.dex ? [{ id: 'dex' as const, label: 'Dex', badge: room.dex.shared.length || undefined }] : []),
     { id: 'explorer', label: 'Explorer' },
     { id: 'suspects', label: 'Suspects', badge: room.mySuspects.length },
     { id: 'board', label: 'Board', badge: room.hints.length || undefined },
@@ -36,7 +38,7 @@ export function Investigate(props: PhaseProps) {
       <div className="sticky top-[57px] z-20 border-b border-line bg-ink/95 backdrop-blur">
         <div className="flex items-center justify-between px-4 pt-2">
           {room.investigateEndsAt && <Countdown endsAt={room.investigateEndsAt} now={now} label="Time" />}
-          <span className="font-mono text-[11px] text-dim">{room.players.length} detectives</span>
+          <span className="font-mono text-[11px] text-dim">{room.mode === 'solo' ? 'Solo with Dex' : `${room.players.length} detectives`}</span>
         </div>
         <nav className="scroll-x flex gap-1 overflow-x-auto px-3 pt-2">
           {tabs.map((t) => (
@@ -60,12 +62,15 @@ export function Investigate(props: PhaseProps) {
       <div className="pt-5 pb-28">
         {tab === 'clues' && (
           <div className="space-y-6 px-4">
-            <p className="text-sm text-dim">Only you can see these. Read them out, screenshot them, argue about them in the group chat.</p>
+            <p className="text-sm text-dim">
+              {room.mode === 'solo' ? 'Your half of the evidence. Dex has the rest.' : 'Only you can see these. Read them out, screenshot them, argue about them in the group chat.'}
+            </p>
             {room.myClues.map((c, i) => (
               <ClueCard key={c.id} clue={c} index={i} />
             ))}
           </div>
         )}
+        {tab === 'dex' && room.dex && <DexPanel {...props} />}
         {tab === 'explorer' && <Explorer {...props} />}
         {tab === 'suspects' && <Interrogation {...props} />}
         {tab === 'board' && (

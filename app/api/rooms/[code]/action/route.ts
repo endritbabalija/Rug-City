@@ -12,6 +12,7 @@ const Action = z.discriminatedUnion('type', [
   z.object({ type: z.literal('vote'), vote: z.object({ culprit: Id, motive: Id, trail: Id }) }),
   z.object({ type: z.literal('trace'), walletId: Id }),
   z.object({ type: z.literal('subpoena'), suspectId: Id }),
+  z.object({ type: z.literal('askDex'), ask: z.enum(['clue', 'hint']) }),
 ])
 
 export const POST = route<Ctx>(async (req, { params }) => {

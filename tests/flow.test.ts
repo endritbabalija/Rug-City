@@ -413,7 +413,7 @@ describe('events', () => {
       await new Promise((r) => setTimeout(r, 0))
       const events = write.mock.calls.flatMap(([batch]) => batch).filter((e) => e.props.code === code)
       expect(events.filter((e) => e.name === 'case_start')).toEqual([
-        expect.objectContaining({ playerId: host, props: { caseId: 'mooncat-exit', seats: 3, code } }),
+        expect.objectContaining({ playerId: host, props: { caseId: 'mooncat-exit', mode: 'crew', seats: 3, code } }),
       ])
       const finishes = events.filter((e) => e.name === 'case_finish')
       expect(finishes.map((e) => e.playerId).sort()).toEqual([host, a, b].sort())
@@ -421,5 +421,91 @@ describe('events', () => {
     } finally {
       write.mockRestore()
     }
+  })
+})
+
+describe('solo with Dex', () => {
+  it('plays a case from create to verdict, rated as solo, for one case', async () => {
+    const [me] = ids(1)
+    await mkPlayer(me)
+    const write = vi.spyOn(store(), 'trackEvents')
+    try {
+      const code = await rooms.createSolo(await fresh(me), 'mooncat-exit')
+      expect((await fresh(me)).freeCaseDay).toBeDefined()
+      const briefing = await rooms.viewRoom(code, await fresh(me))
+      expect(briefing).toMatchObject({ mode: 'solo', phase: 'briefing', member: true })
+
+      await rooms.act(code, await fresh(me), { type: 'ready' })
+      const shared = await rooms.act(code, await fresh(me), { type: 'askDex', ask: 'clue' })
+      expect(shared.dexShared).toHaveLength(1)
+      await rooms.act(code, await fresh(me), { type: 'askDex', ask: 'hint' })
+      const view = await rooms.viewRoom(code, await fresh(me))
+      // The opener, then a scripted line for the clue and one for the hint.
+      expect(view.dex!.messages).toHaveLength(3)
+      expect(view.dex!.messages[1].clue?.id).toBe(shared.dexShared![0])
+      expect(view.dex!.messages[2].hint).toBe(view.hints[0])
+      expect(view.dex!.hintsLeft).toBe(1)
+
+      await rooms.act(code, await fresh(me), { type: 'callVote' })
+      const done = await rooms.act(code, await fresh(me), { type: 'vote', vote: ANSWER })
+      expect(done.phase).toBe('reveal')
+      expect(done.result!.help.dexHint).toBe(1)
+      expect(done.result!.penalty).toBeCloseTo(0.1)
+      // Only the player is settled; Dex has no player row.
+      expect(Object.keys(done.awards!)).toEqual([String(me)])
+      expect(done.awards![String(me)].unrated).toBeUndefined()
+
+      const [row] = await store().recentResults(me, 1)
+      expect(row).toMatchObject({ roomCode: code, mode: 'solo', seats: 1, correct: 3 })
+      expect(row.rating).toBe(done.result!.score)
+      expect((await store().getCaseStats('mooncat-exit', 'solo'))?.plays).toBeGreaterThanOrEqual(1)
+
+      await new Promise((r) => setTimeout(r, 0))
+      const events = write.mock.calls.flatMap(([batch]) => batch)
+      expect(events.find((e) => e.name === 'case_start' && e.props.code === code)?.props).toEqual({ caseId: 'mooncat-exit', mode: 'solo', seats: 1, code })
+      expect(events.filter((e) => e.name === 'dex_ask' && e.props.code === code).map((e) => e.props.ask)).toEqual(['clue', 'hint'])
+    } finally {
+      write.mockRestore()
+    }
+  })
+
+  it('charges a credit once the free case is used, and refunds if the room fails', async () => {
+    const [me] = ids(1)
+    await mkPlayer(me)
+    await rooms.createSolo(await fresh(me), 'mooncat-exit')
+    await expect(rooms.createSolo(await fresh(me), 'mooncat-exit')).rejects.toMatchObject({ code: 'NO_CASES' })
+
+    await store().updatePlayer(me, (p) => ({ ...p, caseCredits: 1 }))
+    const create = vi.spyOn(store(), 'createRoom').mockRejectedValueOnce(new Error('DB down'))
+    try {
+      await expect(rooms.createSolo(await fresh(me), 'mooncat-exit')).rejects.toThrow('DB down')
+    } finally {
+      create.mockRestore()
+    }
+    expect((await fresh(me)).caseCredits).toBe(1)
+    await rooms.createSolo(await fresh(me), 'mooncat-exit')
+    expect((await fresh(me)).caseCredits).toBe(0)
+  })
+
+  it('gives the free case back when the room fails', async () => {
+    const [me] = ids(1)
+    await mkPlayer(me)
+    const create = vi.spyOn(store(), 'createRoom').mockRejectedValueOnce(new Error('DB down'))
+    try {
+      await expect(rooms.createSolo(await fresh(me), 'mooncat-exit')).rejects.toThrow('DB down')
+    } finally {
+      create.mockRestore()
+    }
+    expect((await fresh(me)).freeCaseDay).toBeUndefined()
+  })
+
+  it('keeps other players out', async () => {
+    const [me, other] = ids(2)
+    await mkPlayer(me)
+    await mkPlayer(other)
+    const code = await rooms.createSolo(await fresh(me), 'mooncat-exit')
+    await expect(rooms.act(code, await fresh(other), { type: 'join' })).rejects.toMatchObject({ code: 'WRONG_PHASE' })
+    await rooms.act(code, await fresh(me), { type: 'ready' })
+    await expect(rooms.act(code, await fresh(other), { type: 'askDex', ask: 'clue' })).rejects.toMatchObject({ code: 'NOT_IN_ROOM' })
   })
 })
