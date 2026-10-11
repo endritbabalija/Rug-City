@@ -8,6 +8,7 @@ import type { CaseFile } from './cases/types'
 import type { ItemKey } from './catalog'
 import { badgeInfo } from './catalog'
 import { env } from './env'
+import { flag } from './flags'
 import * as engine from './game/engine'
 import { GameError } from './game/engine'
 import * as dex from './game/dex'
@@ -102,7 +103,7 @@ async function loadChats(code: string, playerId: number) {
 
 export async function viewRoom(code: string, player: Pick<Player, 'id'>) {
   const [{ room, caseFile }, chats] = await Promise.all([loadRoom(code), loadChats(code, player.id)])
-  return { ...buildView(room, caseFile, player.id, Date.now(), chats), member: engine.isMember(room, player.id), minPlayers: minPlayersFor(room.hostId) }
+  return { ...buildView(room, caseFile, player.id, Date.now(), chats), member: engine.isMember(room, player.id), minPlayers: engine.minHumans(room, minPlayersFor(room.hostId)) }
 }
 
 /** Run a pure engine step against the stored room with optimistic concurrency. */
@@ -160,6 +161,9 @@ export type RoomAction =
   | { type: 'trace'; walletId: string }
   | { type: 'subpoena'; suspectId: string }
   | { type: 'askDex'; ask: dex.DexAsk }
+  | { type: 'addDex' }
+  | { type: 'removeDex' }
+  | { type: 'invited' }
 
 export async function act(code: string, player: Player, action: RoomAction) {
   const me = { id: player.id, name: player.name, badge: badgeOf(player) }
@@ -171,7 +175,7 @@ export async function act(code: string, player: Player, action: RoomAction) {
     case 'start': {
       const minPlayers = minPlayersFor(player.id)
       const started = await chargedStep(code, player, ...caseCharge(), (s, _c, now) => engine.start(s, player.id, now, minPlayers))
-      track('case_start', player.id, { caseId: started.caseId, mode: engine.roomMode(started), seats: started.seats.length, code })
+      track('case_start', player.id, { caseId: started.caseId, mode: engine.roomMode(started), seats: humanSeats(started).length, code })
       return started
     }
     case 'ready':
@@ -196,10 +200,21 @@ export async function act(code: string, player: Player, action: RoomAction) {
       return chargedStep(code, player, ...itemCharge('subpoena'), (s, c, now) => engine.subpoena(s, c, player.id, action.suspectId, now))
     case 'askDex':
       return askDex(code, player, action.ask)
+    case 'addDex':
+      if (!(await flag('dex_crew'))) throw new GameError('NOT_AVAILABLE', "Dex can't join crews yet.", 404)
+      return mutate(code, (s, _c, now) => dex.addDex(s, player.id, now))
+    case 'removeDex':
+      return mutate(code, (s, _c, now) => dex.removeDex(s, player.id, now))
+    case 'invited': {
+      // Only recorded: the host tapped invite or copy link. The room doesn't change.
+      const { room } = await loadRoom(code)
+      track('invite_sent', player.id, { code })
+      return room
+    }
   }
 }
 
-/** Dex hands over his next clue or a hint, then says something about it. */
+/** Dex hands over his next clue (solo) or a hint (solo or crew), then says something about it. */
 async function askDex(code: string, player: Player, ask: dex.DexAsk) {
   const { caseFile } = await loadRoom(code)
   let clueId: string | undefined
@@ -228,6 +243,7 @@ async function askDex(code: string, player: Player, ask: dex.DexAsk) {
     hints: caseFile.hints.slice(0, room.hintsRevealed),
     sharedCount: room.dexShared?.length ?? 0,
     lastCase,
+    crew: engine.roomMode(room) === 'crew',
   }
   const text = await dexLine(caseFile, dex.dexHand(room, caseFile).map(clueById), moment, player.id).catch((err) => {
     console.error('Dex line failed', code, err)

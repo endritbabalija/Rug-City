@@ -11,14 +11,14 @@ import { store } from '@/lib/store'
 export const GET = route(async (req) => {
   const { player, init } = await authenticate(req)
   track('app_open', player.id, { startParam: init?.startParam ?? null })
-  const [pub, seasonBanner, solo] = await Promise.all([publicPlayer(player), flag('season_banner'), flag('solo')])
+  const [pub, seasonBanner, solo, dexCrew] = await Promise.all([publicPlayer(player), flag('season_banner'), flag('solo'), flag('dex_crew')])
   return NextResponse.json({
     player: pub,
     startParam: init?.startParam ?? null,
     cases: caseSummaries(),
     skus: SKUS,
     badges: badgeMap(pub.badges),
-    flags: { season_banner: seasonBanner, solo },
+    flags: { season_banner: seasonBanner, solo, dex_crew: dexCrew },
   })
 })
 

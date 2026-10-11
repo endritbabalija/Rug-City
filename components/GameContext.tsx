@@ -14,7 +14,7 @@ export interface GameCtx {
   skus: Sku[]
   badges: Record<string, { name: string; icon: string }>
   /** Feature flags the client needs (lib/flags.ts). */
-  flags: { season_banner: boolean; solo: boolean }
+  flags: { season_banner: boolean; solo: boolean; dex_crew: boolean }
   go: (s: Screen) => void
   toast: (text: string, tone?: 'info' | 'error' | 'ok') => void
   /** Buys an item with Stars and resolves true once it's in the inventory. */

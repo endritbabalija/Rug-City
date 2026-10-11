@@ -99,5 +99,13 @@ export function useRoom(code: string, onPlayer: (p: PublicPlayer) => void) {
 
   const now = useCallback(() => Date.now() + clockOffset.current, [])
 
+  // Dex's crew notes go public on a timer without a room write, so nothing pushes them: fetch when the next one is due.
+  const nextRelease = room?.dex?.nextReleaseAt ?? null
+  useEffect(() => {
+    if (nextRelease === null) return
+    const timer = setTimeout(() => void refresh(), Math.max(0, nextRelease - now()) + 500)
+    return () => clearTimeout(timer)
+  }, [nextRelease, now, refresh])
+
   return { room, error, refresh, act, ask, now }
 }

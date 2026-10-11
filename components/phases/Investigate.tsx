@@ -27,7 +27,7 @@ export function Investigate(props: PhaseProps) {
 
   const tabs: { id: Tab; label: string; badge?: number }[] = [
     { id: 'clues', label: 'My clues', badge: room.myClues.length },
-    ...(room.dex ? [{ id: 'dex' as const, label: 'Dex', badge: room.dex.shared.length || undefined }] : []),
+    ...(room.dex ? [{ id: 'dex' as const, label: room.mode === 'solo' ? 'Dex' : "Dex's notes", badge: room.dex.shared.length || undefined }] : []),
     { id: 'explorer', label: 'Explorer' },
     { id: 'suspects', label: 'Suspects', badge: room.mySuspects.length },
     { id: 'board', label: 'Board', badge: room.hints.length || undefined },

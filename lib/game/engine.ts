@@ -8,6 +8,7 @@ import {
   DEX_ID,
   INVESTIGATE_MS,
   MAX_PLAYERS,
+  MIN_HUMANS_WITH_DEX,
   MIN_PLAYERS,
   QUESTIONS_PER_PLAYER,
   type CaseMode,
@@ -53,7 +54,7 @@ export function log(state: RoomState, playerId: number, text: string, now: numbe
   return { ...state, feed: [...state.feed, { at: now, playerId, text }].slice(-60) }
 }
 
-function nameOf(state: RoomState, playerId: number) {
+export function nameOf(state: RoomState, playerId: number) {
   return state.players.find((p) => p.id === playerId)?.name ?? 'Someone'
 }
 
@@ -142,7 +143,7 @@ export function join(state: RoomState, player: { id: number; name: string; badge
     return { ...state, players: state.players.map((p) => (p.id === player.id ? { ...p, name: player.name, badge: player.badge } : p)) }
   }
   requirePhase(state, 'lobby')
-  if (state.players.length >= MAX_PLAYERS) fail('ROOM_FULL', `This case already has ${MAX_PLAYERS} detectives.`, 409)
+  if (seatsTaken(state) >= MAX_PLAYERS) fail('ROOM_FULL', `This case already has ${MAX_PLAYERS} detectives.`, 409)
   return log({ ...state, players: [...state.players, { ...player, ready: false, joinedAt: now }] }, player.id, `${player.name} joined the case.`, now)
 }
 
@@ -154,12 +155,22 @@ export function leave(state: RoomState, playerId: number, now: number): RoomStat
   return log({ ...state, players, hostId }, playerId, `${nameOf(state, playerId)} left.`, now)
 }
 
+/** Lobby seats in use: the players, plus Dex when the host added him. */
+export const seatsTaken = (state: RoomState) => state.players.length + (state.dexSeated ? 1 : 0)
+
+/** Humans needed to start. Dex lowers the minimum to MIN_HUMANS_WITH_DEX, never raises it. */
+export function minHumans(state: RoomState, minPlayers = MIN_PLAYERS) {
+  return state.dexSeated ? Math.min(minPlayers, MIN_HUMANS_WITH_DEX) : minPlayers
+}
+
 export function start(state: RoomState, actorId: number, now: number, minPlayers = MIN_PLAYERS): RoomState {
   requirePhase(state, 'lobby')
   if (actorId !== state.hostId) fail('HOST_ONLY', 'Only the host can start the case.', 403)
-  if (state.players.length < minPlayers) fail('NOT_ENOUGH_PLAYERS', `You need at least ${minPlayers} detectives.`, 409)
+  const need = minHumans(state, minPlayers)
+  if (state.players.length < need) fail('NOT_ENOUGH_PLAYERS', `You need at least ${need} detectives${state.dexSeated ? ' plus Dex' : ''}.`, 409)
   const seats = state.players.map((p) => p.id)
-  return log(setPhase({ ...state, seats }, 'briefing', now), actorId, 'The case file is open.', now)
+  const withDex = state.dexSeated ? { seats: [...seats, DEX_ID], dexShared: [], dexMessages: [] } : { seats }
+  return log(setPhase({ ...state, ...withDex }, 'briefing', now), actorId, 'The case file is open.', now)
 }
 
 // ── Briefing → investigation ───────────────────────────────────────────────
