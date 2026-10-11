@@ -87,8 +87,10 @@ All routes: `route()` + `authenticate()`, then `requireRefund()` (flag off → 4
 - **Campaign progress**: a later table `campaign_progress (player_id, chapter_id, completed_at, run_id)`, unique on `(player_id, chapter_id)`, written idempotently in `service.act` when a run first resolves. Story order gates chapters; nothing infers completion from started runs.
 - **Co-op**: access is one function, `canAccess(run, playerId)` in `service.ts`, which becomes room membership. The run doc is already the shared state; drafts are already client-only. Realtime would ping "run changed" and clients refetch through the API. Two-player confirmation and "continue alone in a personal copy" (fork the run) are future work.
 
-## 8. Open questions for Endrit
+## 8. Decisions beyond the brief
 
-1. **F03 accepts E02 + E07** in addition to the brief's E06 + E07 and E08 + E07. E07 itself says RD-204's destination is RELAY-72, and E02 shows the refund arriving at RELAY-72, so it is the same direct destination match as E08 + E07. Rejecting it felt unfair. It is one line in `cases/refund.ts` if you'd rather match the table exactly.
-2. **Authored additions** beyond the brief's text, all consistent with §3: Mika's "Ask about the announcement" reply, Cedar's greeting, the "What this means" explainers on six records, decoy claims "Owen typed the wrong destination by mistake" and "Cedar Studio redirected the refund", decoy challenges "You chose RELAY-72 yourself" and "The community was never going to be paid", Dex's contextual lines, case-desk questions after F02, wrong-suspect objections, and the ending wording. Please read them in `cases/refund.ts`.
-3. **Pressure line**: Lena's "I can pay extra" line is a topic ("Ask what she expects from the report") available after F01, rather than something she says unprompted.
+Endrit kept all three on 2026-10-12; revisit them only if playtests show a problem.
+
+1. **F03 also accepts E02 + E07**, besides the brief's E06 + E07 and E08 + E07. E07 itself says RD-204's destination is RELAY-72, and E02 shows the refund arriving there: the same direct destination match as E08 + E07.
+2. **Authored additions** beyond the brief's text, all consistent with its §3: Mika's "Ask about the announcement" reply, Cedar's greeting, the "What this means" explainers on six records, decoy claims "Owen typed the wrong destination by mistake" and "Cedar Studio redirected the refund", decoy challenges "You chose RELAY-72 yourself" and "The community was never going to be paid", per-finding feedback, Dex's contextual lines, case-desk questions after F02, wrong-suspect objections, and the ending wording. All in `cases/refund.ts`.
+3. **Pressure line**: Lena's "I can pay extra" line is the answer to a topic ("Ask what she expects from the report") available after F01, not something she says unprompted.
