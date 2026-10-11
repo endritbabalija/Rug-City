@@ -292,7 +292,7 @@ Use run/case/version/action IDs, success and hint level; never store raw chat te
 
 Run the repo's typecheck, lint, tests and build. Add targeted pure-rule and store-flow tests for the criteria above; preserve meaningful existing regression coverage. Inspect the new experience at mobile dimensions and with keyboard controls if local browser tooling is available. Run the happy path and one alternate path manually; report any browser/Telegram checks you could not perform. Do not label code tests as human playtest evidence.
 
-Write a short architecture note at `docs/architecture.md` (the earlier one is archived): what The Refund implements, and the extension points for later cases, campaign progress and co-op from Game Direction section 9. Deliver changed-file summary, checks and results, exact local launch steps, any additive migration awaiting application, and screenshots only if available from actual inspection. No fabricated test counts or deployment claims.
+Keep `docs/architecture.md` (planned first, see section 12; the earlier one is archived) current: what The Refund implements, and the extension points for later cases, campaign progress and co-op from Game Direction section 9. Deliver changed-file summary, checks and results, exact local launch steps, any additive migration awaiting application, and screenshots only if available from actual inspection. No fabricated test counts or deployment claims.
 
 # 11. Human playtest after implementation
 
@@ -306,7 +306,11 @@ Do not add features to compensate for a weak case. Revise the evidence, clarity 
 
 > Read `Rug City — The Refund Brief.md` completely, and `Rug City — Game Direction.md` for where the game is going (at least sections 1, 7, 8 and 9). The Refund is chapter 1 of a five-chapter arc with co-op planned later: build only The Refund, but keep the architecture boundaries in brief section 9 so later chapters fit. Then inspect the current Rug-City main branch, `AGENTS.md` and repository conventions. Implement the solo investigation on a new branch. Treat the brief as the current product scope; the archived Phase 1 roadmap is background only. The old crew game has been removed; build on the remaining foundation.
 >
-> Start with the canonical case data, pure rules and server projection; implement persistence and the mobile player journey; then run the required checks. Resolve routine implementation details yourself. If the evidence or gating has a genuine logical contradiction, flag it explicitly before changing the story. Do not invent extra mechanics or rely on AI to judge deductions. Finish with a runnable local prototype and verification report. Follow the brief's limits on commits, deployment and shared database changes.
+> **Step 1, architecture plan:** before writing code, write `docs/architecture.md` as a plan: what you reuse from the foundation, the case definition / investigation run / campaign boundaries, the persisted run's fields and table, modules, API routes, and where later chapters and co-op plug in. Keep it short. Then stop and wait for Endrit's approval.
+>
+> **Step 2, build:** start with the canonical case data, pure rules and server projection; implement persistence and the mobile player journey; then run the required checks. Resolve routine implementation details yourself. If the evidence or gating has a genuine logical contradiction, flag it explicitly before changing the story. Do not invent extra mechanics or rely on AI to judge deductions. Finish with a runnable local prototype and verification report.
+>
+> **Step 3:** update `docs/architecture.md` to match what was built, separating implemented pieces from future extension points. Follow the brief's limits on commits, deployment and shared database changes.
 
 ## Reference snapshot
 
